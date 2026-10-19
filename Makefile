@@ -73,20 +73,26 @@ build: ## Build all Docker images (chat-service, auth-stub, chat-web/nginx)
 
 ## ---- Tests -------------------------------------------------------------------
 
-test: test-backend test-frontend ## Run all unit + integration tests (Maven verify + chat-web Vitest)
+test: test-backend test-frontend ## Run all unit + integration tests (Maven verify, chat-web Vitest, chaos unit checks)
 
 test-backend: ## ./mvnw verify: unit tests + Testcontainers integration tests (needs Docker)
 	./mvnw -B verify
 
-test-frontend: chat-web/node_modules ## chat-web lint + Vitest unit tests (Node 24)
+test-frontend: chat-web/node_modules chaos/node_modules ## chat-web lint + Vitest, chaos typecheck + unit checks (Node 24, no Docker)
 	$(NPM) --prefix chat-web run lint
 	$(NPM) --prefix chat-web run test:ci
+	$(NPM) --prefix chaos run typecheck
+	$(NPM) --prefix chaos test
 
 lint-frontend: chat-web/node_modules ## chat-web lint only
 	$(NPM) --prefix chat-web run lint
 
 chat-web/node_modules: chat-web/package-lock.json
 	$(NPM) --prefix chat-web ci --no-audit --no-fund
+	@touch $@
+
+chaos/node_modules: chaos/package-lock.json
+	$(NPM) --prefix chaos ci --no-audit --no-fund
 	@touch $@
 
 e2e: ## Playwright E2E + axe against the running stack (run `make up` first)
@@ -102,7 +108,7 @@ chaos: ## Chaos run against the running stack (kills/starts chat-1/chat-2); GATE
 	npm --prefix chaos ci --no-audit --no-fund
 	CHAOS_VARIANT=default npm --prefix chaos run chaos $(CHAOS_ARGS)
 
-chaos-region: ## O10 variant: chat-2's DB via toxiproxy +REGION_LATENCY_MS (80) ms, then chaos run (p95 reported, not gated)
+chaos-region: ## O10 variant: chat-2's DB via toxiproxy +REGION_LATENCY_MS (80) ms; steady phase + correctness, no kills, p95 reported
 	$(REQUIRE_HOST_NODE24)
 	$(COMPOSE) --profile chaos up -d --wait toxiproxy
 	CHAT2_DB_URL=jdbc:postgresql://toxiproxy:15432/chat \
