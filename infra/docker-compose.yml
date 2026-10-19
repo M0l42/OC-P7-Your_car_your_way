@@ -1,0 +1,112 @@
+# Local stand-in for the target deployment: 2 chat instances behind a load balancer (Fargate + ALB),
+# one Postgres (RDS). Use the root Makefile (`make up`, `make help`) rather than calling this directly.
+#
+# Overridable from the environment:
+#   COMPOSE_PROJECT_NAME   project name (default ycyw-chat) — use a unique one per parallel stack
+#   HTTP_PORT              host port of nginx (default 8080)
+#   POSTGRES_PORT          host port of Postgres, bound to 127.0.0.1 (default 55432)
+#   TOXIPROXY_API_PORT     host port of the toxiproxy API, profile "chaos" (default 8474)
+#   CHAT2_DB_URL / CHAT2_LISTENER_JDBC_URL   point chat-2 at toxiproxy for the O10 region variant
+name: ycyw-chat
+
+x-chat-service: &chat-service
+  build:
+    context: ..
+    dockerfile: chat-service/Dockerfile
+  restart: "no"
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness >/dev/null || exit 1"]
+    interval: 2s
+    timeout: 2s
+    retries: 3
+    start_period: 60s
+    start_interval: 1s
+  stop_grace_period: 5s
+
+x-chat-env: &chat-env
+  DB_USER: chat
+  DB_PASSWORD: chat
+  CHAT_ALLOWED_ORIGINS: http://localhost:${HTTP_PORT:-8080}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      # -h forces TCP: the init-time server only listens on the unix socket.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "chat", "-d", "chat"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
+      start_interval: 1s
+
+  auth-stub:
+    build:
+      context: ..
+      dockerfile: auth-stub/Dockerfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness >/dev/null || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+    stop_grace_period: 5s
+
+  chat-1:
+    <<: *chat-service
+    environment:
+      <<: *chat-env
+      INSTANCE_ID: chat-1
+      DB_URL: jdbc:postgresql://postgres:5432/chat
+      CHAT_LISTENER_JDBC_URL: jdbc:postgresql://postgres:5432/chat?socketTimeout=10&tcpKeepAlive=true
+
+  chat-2:
+    <<: *chat-service
+    environment:
+      <<: *chat-env
+      INSTANCE_ID: chat-2
+      DB_URL: ${CHAT2_DB_URL:-jdbc:postgresql://postgres:5432/chat}
+      CHAT_LISTENER_JDBC_URL: ${CHAT2_LISTENER_JDBC_URL:-jdbc:postgresql://postgres:5432/chat?socketTimeout=10&tcpKeepAlive=true}
+
+  nginx:
+    build:
+      context: ../chat-web
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/nginx-health >/dev/null || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 3
+      start_period: 5s
+      start_interval: 1s
+
+  # O10 region variant: chat-2's pool and listener connections go through toxiproxy (+80 ms added by
+  # `make chaos-region`). chat-1 always talks to Postgres directly.
+  toxiproxy:
+    profiles: ["chaos"]
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./toxiproxy.json:/config/toxiproxy.json:ro
+    ports:
+      - "127.0.0.1:${TOXIPROXY_API_PORT:-8474}:8474"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

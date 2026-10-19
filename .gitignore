@@ -2,3 +2,32 @@
 .idea
 .junie
 CLAUDE.md
+.claude/
+
+# Java / Maven
+target/
+*.class
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+*.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# Chaos run output
+chaos/results/
+
+# Local env overrides
+.env
+
+# OS / editors
+.DS_Store
+*.log
+.vscode/

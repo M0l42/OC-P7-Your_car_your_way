@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Maven verify (unit + Testcontainers)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Testcontainers uses the runner's Docker daemon.
+      - run: ./mvnw -B verify
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+
+  frontend:
+    name: chat-web build, lint, unit (Node 24)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            chat-web/package-lock.json
+            chaos/package-lock.json
+            e2e/package-lock.json
+      - run: node -v
+      - run: npm --prefix chat-web ci --no-audit --no-fund
+      - run: npm --prefix chat-web run lint
+      - run: npm --prefix chat-web run test:ci
+      - run: npm --prefix chat-web run build
+      - name: Typecheck chaos and e2e packages
+        run: |
+          npm --prefix chaos ci --no-audit --no-fund
+          npm --prefix chaos run typecheck
+          npm --prefix e2e ci --no-audit --no-fund
+          npm --prefix e2e run typecheck
+
+  e2e:
+    name: Playwright E2E + axe against compose
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    env:
+      COMPOSE_PROJECT_NAME: ycyw-ci-e2e
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: make up
+      - run: make e2e
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          if-no-files-found: ignore
+      - if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --no-color > compose-logs.txt
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-logs-e2e
+          path: compose-logs.txt
+      - if: always()
+        run: make down
