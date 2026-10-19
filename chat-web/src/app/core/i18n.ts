@@ -65,7 +65,7 @@ const fr = {
   newConversation: 'Nouvelle conversation',
   queueHeading: 'File d’attente',
   queueCount: (shown: number, total: number) =>
-    total === 0 ? 'Aucune conversation en attente' : shown < total ? `${shown} affichées sur ${total} en attente` : `${total} en attente`,
+    total === 0 ? 'Aucune conversation en attente' : shown < total ? `${shown} ${shown === 1 ? 'affichée' : 'affichées'} sur ${total} en attente` : `${total} en attente`,
   queueEmpty: 'Aucune conversation en attente.',
   queueItem: (id: number, ref: string | null) => `Conversation n° ${id}${ref ? `, réservation ${ref}` : ''}`,
   waitingSince: 'en attente depuis',
