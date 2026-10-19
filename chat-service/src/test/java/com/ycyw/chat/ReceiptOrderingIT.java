@@ -9,12 +9,12 @@ import com.ycyw.chat.support.Actors;
 import com.ycyw.chat.support.ChatInstance;
 import com.ycyw.chat.support.StompTestClient;
 import com.ycyw.chat.support.StompTestClient.Frame;
+import com.ycyw.chat.support.TestTokens;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -56,7 +56,7 @@ class ReceiptOrderingIT {
         Actor customer = Actors.customer();
         ConversationService conversations = a.bean(ConversationService.class);
         MessageWriteService writerOnB = b.bean(MessageWriteService.class);
-        try (StompTestClient client = StompTestClient.connect(a.wsUrl(), new StompHeaders())) {
+        try (StompTestClient client = StompTestClient.connect(a.wsUrl(), TestTokens.connectHeaders(customer))) {
             for (int i = 0; i < iterations; i++) {
                 long id = conversations.open(customer, UUID.randomUUID(), null).conversation().id();
                 String topic = "/topic/conversations/" + id;
@@ -74,7 +74,7 @@ class ReceiptOrderingIT {
 
     @Test
     void userQueueSubscriptionsGetNoReceipt() {
-        try (StompTestClient client = StompTestClient.connect(a.wsUrl(), new StompHeaders())) {
+        try (StompTestClient client = StompTestClient.connect(a.wsUrl(), TestTokens.connectHeaders(Actors.agent()))) {
             assertThat(client.subscribeAndAwaitReceipt("/user/queue/acks", Duration.ofSeconds(1))).isFalse();
             assertThat(client.subscribeAndAwaitReceipt("/topic/queue", WAIT)).isTrue();
         }

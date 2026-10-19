@@ -20,7 +20,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        // STOMP authenticates at CONNECT (feat/backend-stomp-security), not at the HTTP upgrade.
+                        // STOMP authenticates at CONNECT (StompAuthInterceptor), not at the HTTP upgrade.
                         .requestMatchers("/ws").permitAll()
                         .anyRequest().authenticated())
                 .build();

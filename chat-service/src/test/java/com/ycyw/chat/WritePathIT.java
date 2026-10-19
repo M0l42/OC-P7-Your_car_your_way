@@ -40,7 +40,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * close, A2), test 4 (claim race) and the NOTIFY side effects. STOMP-level delivery of acks/errors is
  * covered by the STOMP tests.
  */
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(PostgresTestConfiguration.class)
 class WritePathIT {
 

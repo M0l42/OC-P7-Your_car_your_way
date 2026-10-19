@@ -13,7 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /** Schema-level invariants of the data model deliverable (C3, A4, A6), straight SQL on the migrated schema. */
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(PostgresTestConfiguration.class)
 class SchemaConstraintsIT {
 
