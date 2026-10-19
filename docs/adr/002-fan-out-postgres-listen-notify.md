@@ -54,7 +54,7 @@ Scored with the same method as the other choices in the architecture document (Â
 **Re-open trigger for Redis.** Move to Redis if any of these appears:
 
 - sustained traffic above ~100 msg/s per region (an assumption, to validate with the chaos client's
-  throughput measurement);
+  throughput measurement; the mechanism is the instance-wide NOTIFY commit lock, see below);
 - a need for presence or typing state;
 - a need for regional fan-out that does not depend on the EU primary.
 
@@ -70,16 +70,34 @@ Scored with the same method as the other choices in the architecture document (Â
   - NA p95 cross-instance delivery: **TBD**, filled in from the chaos job summary once the
     cross-region run has been executed.
   - Reported, not gated.
-- **Scaling limit (assumption, F4)**:
-  - Not verified against the PostgreSQL documentation yet; see "Verification status" below.
-  - What we believe: NOTIFY serialises notifying transactions at commit (one global lock while
-    the notification is queued), and all notifications go through a single shared queue of bounded
-    size. When that queue is full, notifying transactions fail at commit. A listener that does not
-    consume notifications makes the queue grow.
-  - Why it is acceptable here: the payloads are tiny (`{t,c,s}`, < 100 bytes, far below the 8,000-byte
-    payload limit) and each instance's listener consumes continuously. The serialisation only bounds
-    the throughput of *notifying commits*, which the ~100 msg/s re-open trigger above already treats
-    as the point to revisit.
+- **What the PostgreSQL documentation guarantees** ([NOTIFY, PostgreSQL 17][notify-docs]):
+  - Notifications are delivered only if the transaction commits, and only between transactions.
+    This is what makes "a notification always refers to a committed row" true.
+  - The payload must be shorter than 8,000 bytes in the default configuration. For larger data the
+    documentation recommends storing it in a table and sending its key, which is this design (`{t,c,s}`,
+    < 100 bytes; the listener reloads the row).
+  - All notifications go through one queue, 8 GB in a standard installation. If the queue is full,
+    a transaction that issued NOTIFY fails at commit.
+  - A listening session that stays inside a long transaction blocks the queue cleanup (a warning is
+    logged once the queue is half full). Our listener runs in autocommit and never opens a
+    transaction, so it cannot cause this. `pg_notification_queue_usage()` reports the queue usage and
+    is the metric to watch.
+- **Scaling limit (F4): notifying commits are serialised.**
+  - The documentation page does not describe this. At commit, a transaction that issued NOTIFY
+    takes a global lock (on "database 0", that is the whole instance) so that queue entries appear in
+    commit order. This serialises every notifying commit of the instance, whatever the database or
+    channel. Tom Lane describes this lock as serialising the commits that write the NOTIFY queue
+    ([pgsql-general][tom-lane]).
+  - Field reports describe the symptom: notifying commits that queue up behind each other under
+    load, with no visible CPU or I/O saturation ([Recall.ai][recall], [DBOS][dbos]).
+  - This bottleneck may be lifted in recent PostgreSQL versions. That is unverified: Recall.ai's post
+    was updated to mention a later core commit, but the release was not confirmed. Check the release
+    notes before relying on it.
+  - Why it is acceptable here: support chat is a low write rate per region, and each chat write is one
+    short transaction holding the lock only for its commit. The re-open trigger for Redis (~100 msg/s
+    per region, an assumption to validate with the chaos client's throughput) now has a stated
+    mechanism: the instance-wide commit lock, observable as commit latency growing with write
+    concurrency while CPU and I/O stay low.
 - **Every instance loads every notified row**, even without subscribers: N instances cost N
   primary-key reads per message. This is negligible at PoC scale and another input to the re-open
   trigger.
@@ -101,7 +119,18 @@ Scored with the same method as the other choices in the architecture document (Â
   1,000-iteration run (`-Dreceipt.iterations=1000`) was green on 2026-10-19.
 - Chaos run (`make chaos`): see the `chaos.yml` job summary.
 
-## Verification status
+## Sources
 
-Not yet verified against <https://www.postgresql.org/docs/17/sql-notify.html> (Notes: queue size,
-full-queue behaviour, commit ordering). Until it is, the scaling paragraph above is an assumption.
+- **notify-docs**: PostgreSQL 17 documentation, NOTIFY, <https://www.postgresql.org/docs/17/sql-notify.html>
+- **tom-lane**: Tom Lane, pgsql-general, on the lock that serialises commits writing the NOTIFY queue
+  (its exclusivity matters, not its mode), <https://postgresql.org/message-id/3598.1363354686%40sss.pgh.pa.us>
+- **recall**: Recall.ai engineering blog (field report), <https://recall.ai/blog/postgres-listen-notify-does-not-scale>
+- **dbos**: DBOS blog (field report), <https://dbos.dev/blog/postgres-listen-notify-scalability>
+
+[notify-docs]: https://www.postgresql.org/docs/17/sql-notify.html
+[tom-lane]: https://postgresql.org/message-id/3598.1363354686%40sss.pgh.pa.us
+[recall]: https://recall.ai/blog/postgres-listen-notify-does-not-scale
+[dbos]: https://dbos.dev/blog/postgres-listen-notify-scalability
+
+These sources were checked on 2026-10-19 by web search (search results only); the version that may
+lift the commit lock is still to confirm in the PostgreSQL release notes.
