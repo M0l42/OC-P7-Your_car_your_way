@@ -103,6 +103,9 @@ class RestApiIT {
             long id = first.body().get("id").asLong();
             assertThat(first.raw().headers().firstValue("Location")).hasValue("/api/conversations/" + id);
             JsonNode c = first.body();
+            assertThat(c.propertyNames()).as("exactly the protocol.md §2.1 fields").containsExactlyInAnyOrder(
+                    "id", "status", "customerRef", "customerKind", "reservationReference", "agentRef", "lastSeq",
+                    "createdAt", "claimedAt", "closedAt");
             assertThat(c.get("status").asString()).isEqualTo("en_attente");
             assertThat(c.get("customerRef").asString()).isEqualTo(customer.ref());
             assertThat(c.get("customerKind").asString()).isEqualTo("compte");
@@ -223,6 +226,8 @@ class RestApiIT {
             assertThat(rest.body().get("items").size()).isEqualTo(1);
             assertThat(rest.body().get("hasMore").asBoolean()).isFalse();
             JsonNode item = rest.body().get("items").get(0);
+            assertThat(item.propertyNames()).as("exactly the protocol.md §2.2 fields").containsExactlyInAnyOrder(
+                    "conversationId", "seq", "clientMessageId", "type", "senderRole", "senderRef", "content", "createdAt");
             assertThat(item.get("createdAt").asString()).matches(TIMESTAMP);
             assertThat(item.get("type").asString()).isEqualTo("texte");
 
