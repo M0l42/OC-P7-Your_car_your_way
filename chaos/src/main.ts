@@ -249,8 +249,7 @@ async function main(): Promise<number> {
     `| steady phase (60 s, no kills) | ${steady.n} | ${fmt(steady.p50)} | ${fmt(steady.p95)} | ${fmt(steady.max)} | ${gateLatency ? `p95 < ${SPEC.p95}` : 'reported only'} |`,
     ...(variant === 'default' ? [`| kill phase | ${killLat.n} | ${fmt(killLat.p50)} | ${fmt(killLat.p95)} | ${fmt(killLat.max)} | reported only |`] : []),
     '',
-    `Throughput kill phase: ${killPhaseMs ? (killSent / (killPhaseMs / 1000)).toFixed(1) : '—'} msg/s.`,
-    '',
+    ...(killPhaseMs ? [`Throughput kill phase: ${(killSent / (killPhaseMs / 1000)).toFixed(1)} msg/s.`, ''] : []),
     ...(kills.length
       ? ['| Kill | at (s) | healthy after start (ms) | served by nginx after start (ms) |', '|---|---|---|---|', ...kills.map((k) => `| ${k.service} | ${k.killedAt} | ${Math.round(k.healthyAfterMs)} | ${Math.round(k.routedAfterMs)} |`), '']
       : []),
