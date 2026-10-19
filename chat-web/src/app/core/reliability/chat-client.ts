@@ -50,6 +50,7 @@ import {
 import {
   NOT_FOUND,
   TOKEN_EXPIRED,
+  UNAUTHORIZED,
   destinations,
   validateContent,
   type Ack,
@@ -66,6 +67,8 @@ export type ChatEvent =
   | { type: 'connectionLost' }
   | { type: 'connectionRestored'; recovered: number }
   | { type: 'items'; conversationId: number; items: StreamItem[]; source: ItemSource }
+  /** The post-RECEIPT backfill of a conversation finished (after each (re)subscribe). */
+  | { type: 'synced'; conversationId: number }
   | { type: 'echoes'; conversationId: number }
   | { type: 'ack'; ack: Ack; first: boolean }
   | { type: 'sendFailed'; conversationId: number; clientMessageId: string; code: string }
@@ -89,6 +92,8 @@ export interface ChatClientOptions {
   /** Wall clock for echo timestamps (Date.now by default). */
   wallClock?: () => number;
   receiptTimeoutMs?: number;
+  /** CONNECTED must arrive within this delay after transport.connect, else close + reconnect. */
+  connectTimeoutMs?: number;
   safetyNetMs?: number;
   ackTimeoutMs?: number;
   backoff?: BackoffOptions;
@@ -111,6 +116,7 @@ export class ChatClient {
   private readonly newId: () => string;
   private readonly wallClock: () => number;
   private readonly receiptTimeoutMs: number;
+  private readonly connectTimeoutMs: number;
   private readonly safetyNetMs: number;
   private readonly ackTimeoutMs: number;
   private readonly backoff: BackoffOptions;
@@ -130,6 +136,8 @@ export class ChatClient {
   private connected = false;
   private renewNeeded = false;
   private renewStreak = 0;
+  private unauthorizedRenewed = false; // UNAUTHORIZED triggers at most one renewal per outage
+  private connectTimer: TimerHandle | null = null;
   private outage = false;
   private everReady = false;
   private receiptCounter = 0;
@@ -144,6 +152,7 @@ export class ChatClient {
     this.newId = opts.newId ?? newUuid;
     this.wallClock = opts.wallClock ?? Date.now;
     this.receiptTimeoutMs = opts.receiptTimeoutMs ?? 5000;
+    this.connectTimeoutMs = opts.connectTimeoutMs ?? 10_000;
     this.safetyNetMs = opts.safetyNetMs ?? 2000;
     this.ackTimeoutMs = opts.ackTimeoutMs ?? 5000;
     this.backoff = opts.backoff ?? DEFAULT_BACKOFF;
@@ -175,6 +184,7 @@ export class ChatClient {
   stop(): void {
     this.generation++;
     this.setState('stopped');
+    this.clearConnectTimer();
     this.clearConnectionTimers();
     if (this.reconnectTimer !== null) this.clock.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
@@ -308,6 +318,14 @@ export class ChatClient {
       onError: (err) => gen === this.generation && this.handleError(err),
       onClose: () => gen === this.generation && this.handleClose(),
     };
+    this.connectTimer = this.clock.setTimeout(() => {
+      this.connectTimer = null;
+      // Handshake or CONNECT hanging (e.g. instance killed mid-handshake): give up on this socket.
+      if (gen === this.generation && !this.connected) {
+        this.handleClose();
+        this.opts.transport.close();
+      }
+    }, this.connectTimeoutMs);
     try {
       this.opts.transport.connect(url, token, handlers);
     } catch (e) {
@@ -317,6 +335,7 @@ export class ChatClient {
   }
 
   private handleConnected(instanceId: string | null): void {
+    this.clearConnectTimer();
     this.connected = true;
     this.instanceIdValue = instanceId;
     this.renewStreak = 0;
@@ -375,7 +394,12 @@ export class ChatClient {
     // so a snapshot taken now closes the gap (A1).
     let done: Promise<void> | null = null;
     if (pending.target.kind === 'conversation') {
-      done = this.watched.get(pending.target.id)?.stream.backfill() ?? null;
+      const id = pending.target.id;
+      const gen = this.generation;
+      done = this.watched.get(id)?.stream.backfill() ?? null;
+      void done?.then(() => {
+        if (gen === this.generation && this.watched.has(id)) this.emit({ type: 'synced', conversationId: id });
+      });
     } else if (this.queue) {
       done = this.queue.tracker.refetch();
     }
@@ -386,6 +410,7 @@ export class ChatClient {
   private maybeReady(): void {
     if (this.stateValue !== 'subscribing' || this.pendingReceipts.size > 0) return;
     this.failures = 0;
+    this.unauthorizedRenewed = false;
     this.everReady = true;
     this.setState('ready');
     const recovery = this.recovery;
@@ -438,7 +463,10 @@ export class ChatClient {
   }
 
   private handleError(err: { code: string; receiptId?: string; detail?: string }): void {
-    if (err.code === TOKEN_EXPIRED) {
+    if (err.code === TOKEN_EXPIRED || (err.code === UNAUTHORIZED && !this.unauthorizedRenewed)) {
+      // Expired token (A5), or a token the server rejects: fetch a fresh one before reconnecting.
+      // A second UNAUTHORIZED in the same outage is surfaced instead of looping on renewals.
+      if (err.code === UNAUTHORIZED) this.unauthorizedRenewed = true;
       this.renewNeeded = true;
       return;
     }
@@ -462,6 +490,8 @@ export class ChatClient {
     this.generation++; // late callbacks of this connection are ignored from here on
     const wasConnected = this.connected;
     this.connected = false;
+    this.instanceIdValue = null; // badge shows "no instance" until the next CONNECTED (C5 demo)
+    this.clearConnectTimer();
     this.clearConnectionTimers();
     this.recovery = null;
     if (this.stateValue === 'stopped') return;
@@ -502,6 +532,11 @@ export class ChatClient {
       if (this.queue.safetyTimer !== null) this.clock.clearTimeout(this.queue.safetyTimer);
       this.queue.safetyTimer = null;
     }
+  }
+
+  private clearConnectTimer(): void {
+    if (this.connectTimer !== null) this.clock.clearTimeout(this.connectTimer);
+    this.connectTimer = null;
   }
 
   private dropReceipts(match: (t: ReceiptTarget) => boolean): void {

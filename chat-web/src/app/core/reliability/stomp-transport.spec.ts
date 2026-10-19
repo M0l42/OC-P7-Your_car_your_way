@@ -55,13 +55,14 @@ function setup() {
 }
 
 describe('StompJsTransport', () => {
-  it('configures stompjs: bearer token, own reconnect disabled, heart-beats 10 s', () => {
+  it('configures stompjs: bearer token, own reconnect disabled, 8 s connection timeout, heart-beats 10 s', () => {
     const s = setup();
     s.t.connect('/ws-a', 'jwt', s.h);
     expect(s.clients[0].config).toEqual({
       brokerURL: 'ws://host/ws-a',
       connectHeaders: { Authorization: 'Bearer jwt' },
       reconnectDelay: 0,
+      connectionTimeout: 8_000,
       heartbeatIncoming: 10_000,
       heartbeatOutgoing: 10_000,
     });

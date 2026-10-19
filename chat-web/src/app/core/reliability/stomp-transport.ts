@@ -30,6 +30,7 @@ export interface StompClientConfigLike {
   brokerURL: string;
   connectHeaders: Record<string, string>;
   reconnectDelay: number;
+  connectionTimeout: number;
   heartbeatIncoming: number;
   heartbeatOutgoing: number;
   webSocketFactory?: () => unknown;
@@ -67,6 +68,9 @@ export class StompJsTransport implements Transport {
       brokerURL: this.resolveUrl(url),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 0,
+      // stompjs closes the socket if CONNECTED has not arrived by then (the core has its own,
+      // longer, timeout as a backstop for transports without one).
+      connectionTimeout: 8_000,
       heartbeatIncoming: 10_000,
       heartbeatOutgoing: 10_000,
     });

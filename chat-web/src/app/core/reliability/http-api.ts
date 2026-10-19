@@ -17,7 +17,16 @@ export class ApiError extends Error {
   }
 }
 
-export class HttpChatApi implements ChatApi {
+/** REST actions used by the views on top of what the core needs (protocol §4). */
+export interface ChatRestApi extends ChatApi {
+  myConversations(): Promise<QueuePage>;
+  getConversation(id: number): Promise<Conversation>;
+  openConversation(clientRequestId: string, reservationReference?: string | null): Promise<Conversation>;
+  claim(id: number): Promise<Conversation>;
+  close(id: number): Promise<Conversation>;
+}
+
+export class HttpChatApi implements ChatRestApi {
   constructor(
     private readonly baseUrl: string,
     private readonly tokens: TokenProvider,

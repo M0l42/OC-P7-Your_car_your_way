@@ -153,7 +153,7 @@ describe('ChatClient — reconnect (C5, backoff, A5)', () => {
     await connectReady(s);
     for (let i = 0; i < 3; i++) {
       s.transport.drop();
-      await s.clock.advance(20_000);
+      await s.clock.advance(250); // backoff resets after each ready
       await connectReady(s);
     }
     expect(s.transport.connects().map((c) => c.url)).toEqual(['/ws-a', '/ws', '/ws', '/ws']);
@@ -217,6 +217,54 @@ describe('ChatClient — reconnect (C5, backoff, A5)', () => {
     expect(s.tokens.renewCalls).toBe(2);
   });
 
+  it('no CONNECTED within 10 s → closes the socket and reconnects', async () => {
+    const s = setup();
+    s.client.start();
+    await flush();
+    await s.clock.advance(9999);
+    expect(s.transport.connects().length).toBe(1);
+    await s.clock.advance(1);
+    expect(s.transport.calls.at(-1)).toEqual({ op: 'close' });
+    await s.clock.advance(250);
+    expect(s.transport.connects().length).toBe(2);
+  });
+
+  it('CONNECTED in time cancels the connect timeout', async () => {
+    const s = setup();
+    await connectReady(s);
+    await s.clock.advance(60_000);
+    expect(s.transport.connects().length).toBe(1);
+  });
+
+  it('instance id is cleared while disconnected, then shows the new instance (badge, C5)', async () => {
+    const s = setup();
+    await connectReady(s, 0, 'chat-1');
+    s.transport.drop();
+    expect(s.client.instanceId).toBeNull();
+    expect(s.of('state').at(-1)).toEqual({ type: 'state', state: 'waiting', instanceId: null });
+    await s.clock.advance(250);
+    await connectReady(s, 0, 'chat-2');
+    expect(s.of('state').at(-1)).toEqual({ type: 'state', state: 'ready', instanceId: 'chat-2' });
+  });
+
+  it('UNAUTHORIZED → one renewal per outage, a second one is surfaced and backs off', async () => {
+    const s = setup();
+    s.client.start();
+    await flush();
+    s.transport.error('UNAUTHORIZED');
+    s.transport.drop();
+    await s.clock.advance(0);
+    expect(s.tokens.renewCalls).toBe(1);
+    expect(s.transport.connects().map((c) => c.token)).toEqual(['token-1', 'token-2']);
+    s.transport.error('UNAUTHORIZED');
+    s.transport.drop();
+    expect(s.of('serverError')).toEqual([{ type: 'serverError', code: 'UNAUTHORIZED', detail: undefined }]);
+    expect(s.client.state).toBe('waiting');
+    await s.clock.advance(500);
+    expect(s.transport.connects().length).toBe(3);
+    expect(s.tokens.renewCalls).toBe(1);
+  });
+
   it('late callbacks of a superseded connection are ignored', async () => {
     const s = setup();
     s.client.watchConversation(C);
@@ -266,6 +314,17 @@ describe('ChatClient — recovery announcement (C4 count)', () => {
     const batches = s.of('items').map((e) => [e.items.map((i) => i.seq), e.source]);
     expect(batches.at(-1)).toEqual([[4, 5, 6], 'backfill']);
     expect(s.client.instanceId).toBe('chat-2');
+  });
+
+  it('emits synced after each post-RECEIPT backfill, also when it returned nothing', async () => {
+    const s = setup();
+    s.client.watchConversation(C);
+    await connectReady(s);
+    expect(s.of('synced')).toEqual([{ type: 'synced', conversationId: C }]);
+    s.transport.drop();
+    await s.clock.advance(250);
+    await connectReady(s, 3);
+    expect(s.of('synced').length).toBe(2);
   });
 
   it('restored with 0 when nothing was missed', async () => {

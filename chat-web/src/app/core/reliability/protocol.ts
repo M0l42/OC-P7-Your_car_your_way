@@ -80,6 +80,8 @@ export interface ApiErrorBody {
 
 /** STOMP ERROR / REST 401 code when the token is expired (A5). */
 export const TOKEN_EXPIRED = 'TOKEN_EXPIRED';
+/** STOMP ERROR / REST 401 code for a missing or invalid token. */
+export const UNAUTHORIZED = 'UNAUTHORIZED';
 /** STOMP ERROR code when a SUBSCRIBE is refused by the access policy (carries receipt-id). */
 export const NOT_FOUND = 'NOT_FOUND';
 
