@@ -226,6 +226,7 @@ export class ChatSession {
         this.instanceId.set(e.instanceId);
         break;
       case 'connectionLost':
+        this.initialLoad.clear(); // a first load interrupted by the loss is reported as a recovery
         this.announce(t.connectionLost);
         break;
       case 'connectionRestored':
@@ -233,8 +234,15 @@ export class ChatSession {
         break;
       case 'items':
         if (e.source === 'backfill') this.suppressLiveRegion();
-        if (e.source === 'backfill' && this.initialLoad.delete(e.conversationId)) this.announce(t.historyLoaded(e.items.length));
         this.revision.update((v) => v + 1);
+        break;
+      case 'synced':
+        // First sync of a newly watched conversation only; later syncs are reconnects, announced by
+        // connectionRestored alone (C4).
+        if (this.initialLoad.delete(e.conversationId)) {
+          const n = this.client?.items(e.conversationId).length ?? 0;
+          if (n > 0) this.announce(t.historyLoaded(n));
+        }
         break;
       case 'echoes':
         this.revision.update((v) => v + 1);

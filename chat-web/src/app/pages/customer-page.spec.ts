@@ -126,6 +126,34 @@ describe('CustomerPage', () => {
     expect(text(f, '[data-testid="status-region"]')).toBe('Connexion rétablie, 3 messages récupérés');
   });
 
+  it('C4: conversation opened empty, then a reconnect with 3 missed items → only the recovery summary', async () => {
+    const t = testChat();
+    const f = await render(t);
+    await openAndConnect(t, f, 0);
+    await sleep(350);
+    await settle(f);
+    t.transport.drop();
+    await settle(f);
+    await t.clock.advance(500);
+    t.transport.connected('chat-2');
+    t.transport.receiptAll();
+    await flush();
+    await t.api.replyMessages({ items: items(C, 1, 3), hasMore: false });
+    await settle(f);
+    await sleep(350);
+    await settle(f);
+    expect(text(f, '[data-testid="status-region"]')).toBe('Connexion rétablie, 3 messages récupérés');
+  });
+
+  it('first load of a conversation with history announces the count once', async () => {
+    const t = testChat();
+    const f = await render(t);
+    await openAndConnect(t, f, 4);
+    await sleep(350);
+    await settle(f);
+    expect(text(f, '[data-testid="status-region"]')).toBe('4 messages chargés');
+  });
+
   it('live items keep the log polite (announced one by one)', async () => {
     const t = testChat();
     const f = await render(t);

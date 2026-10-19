@@ -316,6 +316,17 @@ describe('ChatClient — recovery announcement (C4 count)', () => {
     expect(s.client.instanceId).toBe('chat-2');
   });
 
+  it('emits synced after each post-RECEIPT backfill, also when it returned nothing', async () => {
+    const s = setup();
+    s.client.watchConversation(C);
+    await connectReady(s);
+    expect(s.of('synced')).toEqual([{ type: 'synced', conversationId: C }]);
+    s.transport.drop();
+    await s.clock.advance(250);
+    await connectReady(s, 3);
+    expect(s.of('synced').length).toBe(2);
+  });
+
   it('restored with 0 when nothing was missed', async () => {
     const s = setup();
     s.client.watchConversation(C);

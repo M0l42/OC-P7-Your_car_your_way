@@ -67,6 +67,8 @@ export type ChatEvent =
   | { type: 'connectionLost' }
   | { type: 'connectionRestored'; recovered: number }
   | { type: 'items'; conversationId: number; items: StreamItem[]; source: ItemSource }
+  /** The post-RECEIPT backfill of a conversation finished (after each (re)subscribe). */
+  | { type: 'synced'; conversationId: number }
   | { type: 'echoes'; conversationId: number }
   | { type: 'ack'; ack: Ack; first: boolean }
   | { type: 'sendFailed'; conversationId: number; clientMessageId: string; code: string }
@@ -392,7 +394,12 @@ export class ChatClient {
     // so a snapshot taken now closes the gap (A1).
     let done: Promise<void> | null = null;
     if (pending.target.kind === 'conversation') {
-      done = this.watched.get(pending.target.id)?.stream.backfill() ?? null;
+      const id = pending.target.id;
+      const gen = this.generation;
+      done = this.watched.get(id)?.stream.backfill() ?? null;
+      void done?.then(() => {
+        if (gen === this.generation && this.watched.has(id)) this.emit({ type: 'synced', conversationId: id });
+      });
     } else if (this.queue) {
       done = this.queue.tracker.refetch();
     }
