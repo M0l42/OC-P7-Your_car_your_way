@@ -2,13 +2,15 @@ import type { Clock, TimerHandle } from './ports';
 
 /**
  * At most one run in flight; any number of triggers during a run coalesce into exactly one
- * follow-up run (C1). A failed run is retried after `retryMs` unless disposed. The promise returned
- * by `trigger()` settles when the in-flight run and its follow-up (if any) are done.
+ * follow-up run (C1). A failed run is retried every `retryMs` until it succeeds or the runner is
+ * disposed, and the promise returned by `trigger()` settles only then: a caller awaiting a backfill
+ * (e.g. the "connection restored, N recovered" announcement) never reports a sync that did not happen.
  */
 export class CoalescingRunner {
   private running: Promise<void> | null = null;
   private again = false;
   private retryTimer: TimerHandle | null = null;
+  private wakeRetry: (() => void) | null = null;
   private disposed = false;
 
   constructor(
@@ -28,7 +30,6 @@ export class CoalescingRunner {
       this.again = true;
       return this.running;
     }
-    this.cancelRetry();
     this.running = this.loop().finally(() => (this.running = null));
     return this.running;
   }
@@ -36,7 +37,9 @@ export class CoalescingRunner {
   dispose(): void {
     this.disposed = true;
     this.again = false;
-    this.cancelRetry();
+    if (this.retryTimer !== null) this.clock.clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.wakeRetry?.(); // lets a waiting loop end
   }
 
   private async loop(): Promise<void> {
@@ -46,23 +49,21 @@ export class CoalescingRunner {
         await this.task();
       } catch (e) {
         this.onError(e);
-        if (!this.disposed) {
-          this.cancelRetry();
-          this.retryTimer = this.clock.setTimeout(() => {
-            this.retryTimer = null;
-            void this.trigger();
-          }, this.retryMs);
-        }
-        this.again = false;
-        return;
+        if (this.disposed) return;
+        await this.waitRetry();
+        this.again = true; // retry (and absorb any trigger that arrived meanwhile)
       }
     } while (this.again && !this.disposed);
   }
 
-  private cancelRetry(): void {
-    if (this.retryTimer !== null) {
-      this.clock.clearTimeout(this.retryTimer);
-      this.retryTimer = null;
-    }
+  private waitRetry(): Promise<void> {
+    return new Promise((resolve) => {
+      this.wakeRetry = resolve;
+      this.retryTimer = this.clock.setTimeout(() => {
+        this.retryTimer = null;
+        this.wakeRetry = null;
+        resolve();
+      }, this.retryMs);
+    });
   }
 }

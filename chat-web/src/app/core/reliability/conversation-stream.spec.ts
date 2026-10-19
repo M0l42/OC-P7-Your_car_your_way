@@ -115,6 +115,20 @@ describe('ConversationStream — fetches (C1 + P1)', () => {
     expect(s.api.messageCalls.length).toBe(1);
   });
 
+  it('the backfill promise settles only once a retry succeeds', async () => {
+    const s = setup();
+    let done = false;
+    void s.stream.backfill().then(() => (done = true));
+    await s.api.failMessages();
+    expect(done).toBe(false);
+    void s.stream.backfill(); // coalesces into the pending retry, no extra fetch
+    await s.clock.advance(1000);
+    expect(s.api.messageCalls.length).toBe(1);
+    await s.api.replyMessages({ items: items(C, 1, 2), hasMore: false });
+    expect(done).toBe(true);
+    expect(s.rendered()).toEqual([1, 2]);
+  });
+
   it('dispose cancels the retry', async () => {
     const s = setup();
     void s.stream.backfill();
@@ -122,5 +136,6 @@ describe('ConversationStream — fetches (C1 + P1)', () => {
     s.stream.dispose();
     await s.clock.advance(5000);
     expect(s.api.messageCalls.length).toBe(0);
+    expect(s.stream.fetchInFlight).toBe(false);
   });
 });
