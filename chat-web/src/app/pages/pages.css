@@ -1,0 +1,33 @@
+.page {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+.open form {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 28rem;
+}
+.open label {
+  font-weight: 600;
+}
+.open input {
+  font: inherit;
+  padding: 0.45rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.35rem;
+}
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.error {
+  color: var(--err-text);
+  font-weight: 600;
+}
+.new {
+  justify-self: start;
+}
