@@ -61,6 +61,7 @@ Plusieurs piles en parallèle : `COMPOSE_PROJECT_NAME=demo2 HTTP_PORT=18080 POST
 | `chat-1`, `chat-2` | deux instances du service de chat (Fargate) |
 | `auth-stub` | émetteur de jetons de développement (`/dev/tokens`), simule le monolithe |
 | `postgres` (17) | base `chat` propre au service (RDS) |
+| `jwt-keys` (ponctuel) | génère une fois la paire RSA de développement (volume `jwt-keys`) : clé privée → auth-stub, clé publique → chat-1/chat-2 (configuration, pas d'appel à l'émetteur) |
 | `toxiproxy` (profil `chaos`) | latence simulée entre chat-2 et la base (variante transatlantique) |
 
 ---
@@ -119,6 +120,7 @@ Parallel stacks: `COMPOSE_PROJECT_NAME=demo2 HTTP_PORT=18080 POSTGRES_PORT=55433
 | `chat-1`, `chat-2` | two chat service instances (Fargate) |
 | `auth-stub` | dev-only token issuer (`/dev/tokens`) standing in for the monolith |
 | `postgres` (17) | the service's own `chat` database (RDS) |
+| `jwt-keys` (one-shot) | generates the dev-only RSA keypair once (`jwt-keys` volume): private key → auth-stub, public key → chat-1/chat-2 (config, no call to the issuer) |
 | `toxiproxy` (profile `chaos`) | simulated latency between chat-2 and the database (cross-region variant) |
 
 ### Repository layout
