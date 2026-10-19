@@ -1,6 +1,6 @@
 # Wire protocol — chat-service
 
-Status: **draft v0.1** (owner: Backend, reviewer: Frontend). Any change goes through a reviewed PR;
+Status: **v0.2** (reviewed by Frontend) (owner: Backend, reviewer: Frontend). Any change goes through a reviewed PR;
 nobody changes this file silently. Decision IDs refer to the design doc's ledger.
 
 This is the contract between `chat-service` and its clients (Angular `chat-web`, the Node `chaos/`
@@ -91,7 +91,7 @@ FR/EN strings.
 |---|---|
 | URL | `/ws` (native WebSocket, no SockJS). Demo-only first-connection pins: `/ws-a` → chat-1, `/ws-b` → chat-2 (C5); every **re**connect uses `/ws` |
 | Protocol | STOMP 1.2 (`accept-version:1.2`) |
-| Origin | handshake rejected with HTTP 403 unless `Origin` is in `chat.allowed-origins` (compose: the nginx origin) (A7) |
+| Origin | a handshake with an `Origin` header not listed in `chat.allowed-origins` (compose: the nginx origin) → HTTP 403 (A7). A handshake **without** `Origin` (non-browser clients: Node chaos client, Java test client) is accepted |
 | Readiness | handshake answers HTTP 503 while the instance's `LISTEN` connection is not active; nginx then retries the other instance (A3/F9) |
 | Frame size | inbound STOMP frames limited to 16 KB; larger → the server closes the session (A7) |
 | Heart-beats | server offers `10000,10000`; clients should send `heart-beat:10000,10000` |
@@ -117,7 +117,9 @@ Success → `CONNECTED` with these headers (in addition to the standard `version
 | `instance-id` | `chat-1` | instance badge (C5) |
 | `user-name` | `customer-1` | the JWT `sub` as seen by the server |
 
-Failure → `ERROR` frame, then the server closes the connection:
+Failure → `ERROR` frame, then the server closes the connection. On every `ERROR` frame the
+`message` header **is the machine code**; clients match on it and never parse the body (its wording
+may change):
 
 | `message` header | Body (first token = the code) | When | Client action |
 |---|---|---|---|
@@ -139,8 +141,9 @@ Failure → `ERROR` frame, then the server closes the connection:
 
 Any other SUBSCRIBE or SEND destination (in particular SEND to `/topic/**`) → `ERROR`
 `message:FORBIDDEN` and the connection is closed. A SUBSCRIBE refused by the access policy
-(not a participant / not visible) → `ERROR` `message:NOT_FOUND`, connection closed; the `ERROR` carries
-`receipt-id` when the SUBSCRIBE had a `receipt` header.
+(not a participant / not visible) → `ERROR` `message:NOT_FOUND`, connection closed. Every
+SUBSCRIBE-related `ERROR` (`NOT_FOUND`, `FORBIDDEN`) carries `receipt-id` when the SUBSCRIBE had a
+`receipt` header, so the client can drop that one destination before reconnecting instead of looping.
 
 ### 3.4 SUBSCRIBE and RECEIPT rules (A1, O7)
 
@@ -195,7 +198,7 @@ Error, on `/user/queue/errors` (sending session only; no row was written):
 | `CONVERSATION_CLOSED` | conversation is `cloturee` and this `clientMessageId` was not stored before the close |
 | `NOT_FOUND` | conversation does not exist or is not visible to this user (§5) |
 | `FORBIDDEN` | visible but this user may not post (agent on an unclaimed conversation, or the `clientMessageId` belongs to another sender) |
-| `INVALID_CONTENT` | `content` null, blank, or not 1–2000 characters (Unicode code points, same as PostgreSQL `char_length`) |
+| `INVALID_CONTENT` | `content` null, blank (only whitespace), or not 1–2000 characters (Unicode code points, same as PostgreSQL `char_length`). The server does **not** trim: it validates and stores `content` exactly as sent (clients send trimmed content) |
 | `INVALID_REQUEST` | body is not valid JSON, or `clientMessageId` missing / not a UUID (`clientMessageId` may then be `null`) |
 
 Rules for clients:
@@ -401,3 +404,5 @@ Reconnect (both): §3.4 procedure, then resend every unacked outbox entry with t
 ## Changelog
 
 - v0.1 (draft) — initial contract, for Frontend review.
+- v0.2 — Frontend review: missing `Origin` accepted; `message` header is the machine code; every
+  SUBSCRIBE-related `ERROR` carries `receipt-id`; server does not trim content.
