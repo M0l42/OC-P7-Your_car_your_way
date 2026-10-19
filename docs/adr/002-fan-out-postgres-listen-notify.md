@@ -71,8 +71,7 @@ Scored with the same method as the other choices in the architecture document (Â
     cross-region run has been executed.
   - Reported, not gated.
 - **Scaling limit (assumption, F4)**:
-  - Not verified against the PostgreSQL documentation yet. The documentation check was blocked in this
-    environment; see "Verification status" below.
+  - Not verified against the PostgreSQL documentation yet; see "Verification status" below.
   - What we believe: NOTIFY serialises notifying transactions at commit (one global lock while
     the notification is queued), and all notifications go through a single shared queue of bounded
     size. When that queue is full, notifying transactions fail at commit. A listener that does not
@@ -97,14 +96,12 @@ Scored with the same method as the other choices in the architecture document (Â
   - a half-open connection (timeout toxic) is detected within 16 s.
 - O1 `ListenerFailureIT.LoadFailure`: an injected load failure closes the sessions, and the client
   recovers the message by backfill.
-- Test 4e `ReceiptOrderingIT`: 1,000 iterations of subscribe, then receipt, then an immediate commit
-  on the other instance. Every item was delivered live.
+- Test 4e `ReceiptOrderingIT`: subscribe, then receipt, then an immediate commit on the other
+  instance; every item must be delivered live. It runs 100 iterations in every `./mvnw verify`; a
+  1,000-iteration run (`-Dreceipt.iterations=1000`) was green on 2026-10-19.
 - Chaos run (`make chaos`): see the `chaos.yml` job summary.
 
 ## Verification status
 
-The planned check of the scaling assumption against
-<https://www.postgresql.org/docs/17/sql-notify.html> (the "Notes" section: queue size, full-queue
-behaviour, commit ordering) could not be run in the build environment of 2026-10-19. The headless
-browser that the project uses for web access needs Node 20+, and the host had Node 18. Until someone
-reads that page and quotes it here, the scaling paragraph above stays an assumption.
+Not yet verified against <https://www.postgresql.org/docs/17/sql-notify.html> (Notes: queue size,
+full-queue behaviour, commit ordering). Until it is, the scaling paragraph above is an assumption.

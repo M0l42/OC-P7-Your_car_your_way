@@ -72,7 +72,21 @@ order**. A reader resuming "after seq N" can never skip a row. The client detect
 - `readerPollingAfterItsHighWaterMarkSeesEverySeqUnderConcurrentWriters`: 8 writers × 50 messages, and a
   reader resuming after its high-water mark sees exactly 1..400 in order.
 
-### psql transcript (PostgreSQL 17.11, two writer sessions plus a reader, 2026-10-19)
+### Two-session psql run (PostgreSQL 17.11, 2026-10-19)
+
+Condensed log of a scripted run: two writer sessions and a reader, each a `psql` session in a
+throwaway `postgres:17-alpine` container (`docker exec`, no local psql). It uses simplified tables
+rather than the V1 schema, so that only the ordering mechanism is visible:
+
+```sql
+CREATE TABLE bigserial_message (id BIGSERIAL PRIMARY KEY, content TEXT NOT NULL);
+CREATE TABLE conversation (id BIGINT PRIMARY KEY, last_seq INT NOT NULL DEFAULT 0);
+CREATE TABLE message (conversation_id BIGINT, seq INT, content TEXT, PRIMARY KEY (conversation_id, seq));
+INSERT INTO conversation (id) VALUES (1);
+```
+
+Statements and query results are as psql printed them. Timestamps come from the script, and the
+`--` comments and `<--` markers were added.
 
 Global BIGSERIAL: id 1 is committed after id 2 and is skipped by a resuming reader.
 
@@ -126,6 +140,6 @@ SELECT seq, content FROM message WHERE conversation_id = 1 AND seq > 0 ORDER BY 
 ```
 
 Session 2 was blocked from 10:15:52.394 to 10:15:54.489 (about 2.1 s, until session 1 committed) and
-only then took `last_seq = 2`. The transcript was produced by a scripted two-session run in a
-throwaway `postgres:17-alpine` container (`docker exec … psql`, no local psql). The Lead Dev reproduced
-the same blocking by hand during review (the second writer waited 4.04 s, then got `last_seq = 2`).
+only then took `last_seq = 2`. The Lead Dev reproduced the same blocking by hand during review, with
+the write path's statements: the second writer waited 4.04 s, then got `last_seq = 2`. Test 1 runs the
+same scenario against the real V1 schema on every build.
