@@ -327,6 +327,23 @@ describe('ChatClient — recovery announcement (C4 count)', () => {
     expect(s.of('synced').length).toBe(2);
   });
 
+  it('restored is announced only after the backfill actually succeeded (REST failing → retried)', async () => {
+    const s = setup();
+    s.client.watchConversation(C);
+    await connectReady(s, 2);
+    s.transport.drop();
+    await s.clock.advance(250);
+    await connect(s, 'chat-2');
+    s.transport.receiptAll();
+    await flush();
+    await s.api.failMessages();
+    expect(s.client.state).toBe('ready');
+    expect(s.of('connectionRestored')).toEqual([]);
+    await s.clock.advance(1000);
+    await s.api.replyMessages({ items: items(C, 3, 3), hasMore: false });
+    expect(s.of('connectionRestored')).toEqual([{ type: 'connectionRestored', recovered: 1 }]);
+  });
+
   it('restored with 0 when nothing was missed', async () => {
     const s = setup();
     s.client.watchConversation(C);
