@@ -13,8 +13,15 @@ spring:
     locations: classpath:db/migration
 
 chat:
-  # Shown in the instance badge and /actuator/info; chat-1 / chat-2 in compose.
+  # Shown in the instance badge (CONNECTED instance-id header) and /actuator/info; chat-1 / chat-2 in compose.
   instance-id: ${INSTANCE_ID:local}
+  # A7: browser Origins accepted on /ws (comma-separated); a missing Origin is accepted.
+  allowed-origins: ${CHAT_ALLOWED_ORIGINS:http://localhost:8080}
+  jwt:
+    # Issuer's RS256 public key, X.509 SPKI PEM (compose: dev key from the jwt-keys volume). Required.
+    public-key-location: ${CHAT_JWT_PUBLIC_KEY_LOCATION:}
+    issuer: ${CHAT_JWT_ISSUER:ycyw-auth-stub}
+    audience: ${CHAT_JWT_AUDIENCE:ycyw-chat}
   listener:
     # Dedicated LISTEN connection, separate from the Hikari pool (F9). Compose points chat-2's at
     # toxiproxy in the O10 region variant. Blank → the pool's URL (and always the pool's credentials).
