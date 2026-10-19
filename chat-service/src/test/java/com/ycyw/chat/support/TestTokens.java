@@ -7,26 +7,18 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.ycyw.chat.security.Actor;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Date;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 
-/** Signs tokens like auth-stub, with the TEST-ONLY key in src/test/resources/test-jwt. */
+/** Signs tokens like auth-stub, with the per-JVM test key ({@link TestKeys}). */
 public final class TestTokens {
-
-    private static final PrivateKey KEY = load("/test-jwt/private.pem");
 
     private TestTokens() {
     }
@@ -47,7 +39,7 @@ public final class TestTokens {
             claims.claim("reservation_reference", actor.reservationReference());
         }
         customizer.accept(claims);
-        return sign(claims.build(), KEY);
+        return sign(claims.build(), TestKeys.privateKey());
     }
 
     public static String expired(Actor actor) {
@@ -90,16 +82,6 @@ public final class TestTokens {
             jwt.sign(new RSASSASigner(key));
             return jwt.serialize();
         } catch (JOSEException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static PrivateKey load(String resource) {
-        try (InputStream in = TestTokens.class.getResourceAsStream(resource)) {
-            String pem = new String(in.readAllBytes(), StandardCharsets.US_ASCII)
-                    .replaceAll("-----(BEGIN|END) PRIVATE KEY-----", "").replaceAll("\\s", "");
-            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem)));
-        } catch (IOException | GeneralSecurityException e) {
             throw new IllegalStateException(e);
         }
     }
