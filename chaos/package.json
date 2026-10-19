@@ -2,18 +2,22 @@
   "name": "ycyw-chaos",
   "version": "0.0.0",
   "private": true,
-  "description": "Chaos client: drives docker compose kill/start against the two chat instances and asserts zero loss (owned by Frontend).",
+  "description": "Chaos client: drives docker compose kill/start against the two chat instances and asserts zero loss, reusing chat-web's reliability core (owned by Frontend).",
   "type": "module",
   "engines": {
     "node": "^24"
   },
   "scripts": {
     "chaos": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2"
+  },
+  "dependencies": {
+    "@stomp/stompjs": "7.3.0"
   }
 }
