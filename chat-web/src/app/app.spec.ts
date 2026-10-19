@@ -20,7 +20,7 @@ describe('App', () => {
 
   it.each([
     ['/', 'Contacter le support'],
-    ['/agent', 'chat agent'],
+    ['/agent', 'Espace conseiller'],
   ])('routes %s to its view', async (url, heading) => {
     TestBed.inject(I18n).lang.set('fr');
     const fixture = TestBed.createComponent(App);

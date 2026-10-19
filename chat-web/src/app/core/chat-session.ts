@@ -211,12 +211,26 @@ export class ChatSession {
     return this.client?.echoes(conversationId) ?? [];
   }
 
-  /** Puts `text` in the status live region; clearing first makes a repeated text announced again. */
-  announce(text: string): void {
+  /**
+   * Puts `text` in the status live region; clearing first makes a repeated text announced again.
+   * Texts arriving in the same 100 ms window are joined rather than overwriting each other (e.g.
+   * "claimed" then "1 message loaded"); a pending text made obsolete (`supersedes`, e.g. "lost"
+   * when "restored" arrives) is dropped.
+   */
+  announce(text: string, supersedes?: string): void {
+    if (supersedes) this.pendingAnnouncements = this.pendingAnnouncements.filter((p) => p !== supersedes);
+    this.pendingAnnouncements.push(text);
     this.announcement.set('');
     if (this.announceTimer) clearTimeout(this.announceTimer);
-    this.announceTimer = setTimeout(() => this.announcement.set(text), 100);
+    this.announceTimer = setTimeout(() => {
+      const parts = this.pendingAnnouncements;
+      this.announcement.set(parts.length === 1 ? parts[0] : parts.map((p, i) => (i === parts.length - 1 || /[.…!?]$/.test(p) ? p : `${p}.`)).join(' '));
+      this.pendingAnnouncements = [];
+      this.announceTimer = null;
+    }, 100);
   }
+
+  private pendingAnnouncements: string[] = [];
 
   private onEvent(e: ChatEvent): void {
     const t = this.i18n.t;
@@ -230,7 +244,7 @@ export class ChatSession {
         this.announce(t.connectionLost);
         break;
       case 'connectionRestored':
-        this.announce(t.connectionRestored(e.recovered));
+        this.announce(t.connectionRestored(e.recovered), t.connectionLost);
         break;
       case 'items':
         if (e.source === 'backfill') this.suppressLiveRegion();
