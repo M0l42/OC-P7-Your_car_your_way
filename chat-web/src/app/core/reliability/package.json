@@ -1,0 +1,5 @@
+{
+  "//": "ESM marker so Node (tsx, chaos/) loads this framework-free core as ES modules (D21/O2).",
+  "type": "module",
+  "sideEffects": false
+}
