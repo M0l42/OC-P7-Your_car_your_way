@@ -17,7 +17,7 @@ export POSTGRES_PORT ?= 55432
 export TOXIPROXY_API_PORT ?= 8474
 REGION_LATENCY_MS ?= 80
 
-COMPOSE_FILE := infra/docker-compose.yml
+COMPOSE_FILE := $(CURDIR)/infra/docker-compose.yml
 export COMPOSE_FILE
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 BASE_URL := http://localhost:$(HTTP_PORT)
