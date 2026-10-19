@@ -10,12 +10,12 @@ import com.ycyw.chat.support.Actors;
 import com.ycyw.chat.support.ChatInstance;
 import com.ycyw.chat.support.StompTestClient;
 import com.ycyw.chat.support.StompTestClient.Frame;
+import com.ycyw.chat.support.TestTokens;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -51,8 +51,8 @@ class CrossInstanceFanoutIT {
         a.close();
     }
 
-    private static StompTestClient client(ChatInstance instance) {
-        return StompTestClient.connect(instance.wsUrl(), new StompHeaders());
+    private static StompTestClient client(ChatInstance instance, Actor actor) {
+        return StompTestClient.connect(instance.wsUrl(), TestTokens.connectHeaders(actor));
     }
 
     private JsonNode body(Frame frame) {
@@ -64,7 +64,7 @@ class CrossInstanceFanoutIT {
     void itemsCommittedOnOneInstanceReachSubscribersOfTheOther() throws Exception {
         Actor customer = Actors.customer();
         Actor agent = Actors.agent();
-        try (StompTestClient onA = client(a); StompTestClient onB = client(b)) {
+        try (StompTestClient onA = client(a, customer); StompTestClient onB = client(b, agent)) {
             onB.subscribeWithReceipt("/topic/queue", WAIT);
 
             // Customer opens through A: the agent's queue on B hears about it.
@@ -115,7 +115,7 @@ class CrossInstanceFanoutIT {
         Actor customer = Actors.customer();
         Conversation c = a.bean(ConversationService.class).open(customer, UUID.randomUUID(), null).conversation();
         String topic = "/topic/conversations/" + c.id();
-        try (StompTestClient onA = client(a)) {
+        try (StompTestClient onA = client(a, customer)) {
             onA.subscribeWithReceipt(topic, WAIT);
             MessageWriteService writerOnB = b.bean(MessageWriteService.class);
             for (int i = 1; i <= 100; i++) {

@@ -12,6 +12,7 @@ import com.ycyw.chat.security.Actor;
 import com.ycyw.chat.support.Actors;
 import com.ycyw.chat.support.ChatInstance;
 import com.ycyw.chat.support.StompTestClient;
+import com.ycyw.chat.support.TestTokens;
 import com.ycyw.chat.support.Toxiproxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,7 +30,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.testcontainers.containers.Network;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.toxiproxy.ToxiproxyContainer;
@@ -74,7 +74,8 @@ class ListenerFailureIT {
     }
 
     static StompTestClient subscribed(ChatInstance instance, long conversationId) {
-        StompTestClient client = StompTestClient.connect(instance.wsUrl(), new StompHeaders());
+        // An agent may watch any waiting conversation; every conversation here stays en_attente.
+        StompTestClient client = StompTestClient.connect(instance.wsUrl(), TestTokens.connectHeaders(Actors.agent()));
         client.subscribeWithReceipt("/topic/conversations/" + conversationId, WAIT);
         return client;
     }
