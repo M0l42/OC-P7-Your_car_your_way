@@ -42,10 +42,10 @@ make start-1     # redémarre chat-1 et attend qu'il soit prêt
 Tests :
 
 ```bash
-make test        # ./mvnw verify (unitaires + Testcontainers) + tests unitaires Vitest de chat-web
+make test        # ./mvnw verify (unitaires + Testcontainers) + Vitest chat-web + vérifications unitaires du client de chaos
 make e2e         # Playwright + axe contre la pile lancée (make up d'abord)
 make chaos       # test de chaos (kill/start des instances) ; GATE_LATENCY=1 pour vérifier p95 < 300 ms
-make chaos-region  # variante O10 : connexions BD de chat-2 via toxiproxy +80 ms
+make chaos-region  # variante O10 : BD de chat-2 via toxiproxy +80 ms ; phase stable + exactitude, sans kill, p95 rapporté
 ```
 
 Base de données : aucun `psql` local n'est nécessaire, `make psql` ouvre psql **dans le conteneur
@@ -101,10 +101,10 @@ make start-1     # start chat-1 again and wait until it is ready
 Tests:
 
 ```bash
-make test        # ./mvnw verify (unit + Testcontainers) + chat-web Vitest unit tests
+make test        # ./mvnw verify (unit + Testcontainers) + chat-web Vitest + chaos client unit checks
 make e2e         # Playwright + axe against the running stack (make up first)
 make chaos       # chaos run (kills/starts instances); GATE_LATENCY=1 also gates p95 < 300 ms
-make chaos-region  # O10 variant: chat-2's DB connections through toxiproxy +80 ms
+make chaos-region  # O10 variant: chat-2's DB through toxiproxy +80 ms; steady phase + correctness, no kills, p95 reported
 ```
 
 Database: no local `psql` needed — `make psql` runs psql **inside the Postgres container** on the

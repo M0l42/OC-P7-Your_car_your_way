@@ -52,10 +52,11 @@ jobs:
       - run: npm --prefix chat-web run lint
       - run: npm --prefix chat-web run test:ci
       - run: npm --prefix chat-web run build
-      - name: Typecheck chaos and e2e packages
+      - name: Typecheck chaos and e2e packages, chaos unit tests
         run: |
           npm --prefix chaos ci --no-audit --no-fund
           npm --prefix chaos run typecheck
+          npm --prefix chaos test
           npm --prefix e2e ci --no-audit --no-fund
           npm --prefix e2e run typecheck
 
