@@ -1,0 +1,42 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: chat-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/chat}
+    username: ${DB_USER:chat}
+    password: ${DB_PASSWORD:chat}
+  flyway:
+    locations: classpath:db/migration
+
+chat:
+  # Shown in the instance badge and /actuator/info; chat-1 / chat-2 in compose.
+  instance-id: ${INSTANCE_ID:local}
+  listener:
+    # Dedicated LISTEN connection, separate from the Hikari pool (F9). Compose points chat-2's at
+    # toxiproxy in the O10 region variant.
+    jdbc-url: ${CHAT_LISTENER_JDBC_URL:${spring.datasource.url}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  instance-id: ${chat.instance-id}

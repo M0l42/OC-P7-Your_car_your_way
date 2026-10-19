@@ -1,0 +1,62 @@
+name: chaos
+
+# Kill-an-instance test (F11): compose stack up, then the Node chaos client kills/starts chat-1/chat-2
+# through the docker compose CLI. Push/PR gate correctness only (lost, duplicated, out-of-order,
+# unacked, queue == DB); p95 < 300 ms is gated only on manual runs with gate_latency (O5).
+# The README badge points at this workflow's status (F6); counts go to the job summary.
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      gate_latency:
+        description: Also gate steady-phase p95 < 300 ms (O5)
+        type: boolean
+        default: true
+
+concurrency:
+  group: chaos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  chaos:
+    name: chaos (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # region = O10: chat-2's DB connections through toxiproxy +80 ms, p95 reported, never gated.
+        variant: [default, region]
+    env:
+      COMPOSE_PROJECT_NAME: ycyw-ci-chaos-${{ matrix.variant }}
+      GATE_LATENCY: ${{ matrix.variant == 'default' && github.event_name == 'workflow_dispatch' && inputs.gate_latency && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: chaos/package-lock.json
+      - name: Stack up (docker compose up --wait)
+        run: make up
+      - name: Chaos run
+        run: |
+          if [ "${{ matrix.variant }}" = "region" ]; then make chaos-region; else make chaos; fi
+      - if: failure()
+        run: docker compose -f infra/docker-compose.yml --profile chaos logs --no-color > compose-logs.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-${{ matrix.variant }}
+          path: |
+            chaos/results/
+            compose-logs.txt
+          if-no-files-found: ignore
+      - if: always()
+        run: make down

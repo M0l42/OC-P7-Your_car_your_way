@@ -1,0 +1,15 @@
+**/target
+**/node_modules
+**/dist
+**/.angular
+**/coverage
+**/playwright-report
+**/test-results
+.git
+.claude
+.idea
+.gstack
+OC-docs_and_livrable
+chaos
+e2e
+docs
