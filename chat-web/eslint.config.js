@@ -34,6 +34,16 @@ module.exports = defineConfig([
     },
   },
   {
+    // D21/O2: the reliability core is shared with the Node chaos client — no framework imports.
+    files: ['src/app/core/reliability/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['@angular/*', 'rxjs', 'rxjs/*', '@stomp/*'], message: 'The reliability core stays framework-free (D21); inject adapters instead.' }] },
+      ],
+    },
+  },
+  {
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {},
