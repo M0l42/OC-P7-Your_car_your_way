@@ -7,6 +7,10 @@
 #   POSTGRES_PORT          host port of Postgres, bound to 127.0.0.1 (default 55432)
 #   TOXIPROXY_API_PORT     host port of the toxiproxy API, profile "chaos" (default 8474)
 #   CHAT2_DB_URL / CHAT2_LISTENER_JDBC_URL   point chat-2 at toxiproxy for the O10 region variant
+#
+# JWT (dev-only): the one-shot jwt-keys service writes an RS256 keypair into the jwt-keys volume;
+# auth-stub mounts only the private key (AUTH_PRIVATE_KEY_LOCATION), chat-1/chat-2 only the public
+# key (CHAT_JWT_PUBLIC_KEY_LOCATION). Issuer/audience use the apps' defaults.
 name: ycyw-chat
 
 x-chat-service: &chat-service
@@ -17,6 +21,16 @@ x-chat-service: &chat-service
   depends_on:
     postgres:
       condition: service_healthy
+    jwt-keys:
+      condition: service_completed_successfully
+  # Public key only (volume subpath), read-only.
+  volumes:
+    - type: volume
+      source: jwt-keys
+      target: /keys
+      read_only: true
+      volume:
+        subpath: public
   healthcheck:
     test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness >/dev/null || exit 1"]
     interval: 2s
@@ -30,6 +44,7 @@ x-chat-env: &chat-env
   DB_USER: chat
   DB_PASSWORD: chat
   CHAT_ALLOWED_ORIGINS: http://localhost:${HTTP_PORT:-8080}
+  CHAT_JWT_PUBLIC_KEY_LOCATION: file:/keys/public.pem
 
 services:
   postgres:
@@ -50,10 +65,32 @@ services:
       start_period: 10s
       start_interval: 1s
 
+  # DEV-ONLY: generates the RS256 keypair into the jwt-keys volume once (kept until `make clean`).
+  jwt-keys:
+    image: alpine/openssl:3.5.8
+    entrypoint: ["/bin/sh", "/generate.sh"]
+    volumes:
+      - ./jwt-keys/generate.sh:/generate.sh:ro
+      - jwt-keys:/keys
+    restart: "no"
+
   auth-stub:
     build:
       context: ..
       dockerfile: auth-stub/Dockerfile
+    depends_on:
+      jwt-keys:
+        condition: service_completed_successfully
+    environment:
+      AUTH_PRIVATE_KEY_LOCATION: file:/keys/private.pem
+    # Private key only (volume subpath), read-only.
+    volumes:
+      - type: volume
+        source: jwt-keys
+        target: /keys
+        read_only: true
+        volume:
+          subpath: private
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness >/dev/null || exit 1"]
       interval: 2s
@@ -110,3 +147,4 @@ services:
 
 volumes:
   pgdata:
+  jwt-keys:
