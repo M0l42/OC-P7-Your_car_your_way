@@ -34,8 +34,13 @@ class ChatServiceApplicationIT {
     }
 
     @Test
-    void readinessIsUp() throws Exception {
+    void readinessIsUpOnceListenIsActive() throws Exception {
+        // Readiness includes the LISTEN connection (ListenerReadiness), which starts after the web server.
         HttpResponse<String> response = get("/actuator/health/readiness");
+        for (int i = 0; i < 100 && response.statusCode() != 200; i++) {
+            Thread.sleep(100);
+            response = get("/actuator/health/readiness");
+        }
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"UP\"");
     }
