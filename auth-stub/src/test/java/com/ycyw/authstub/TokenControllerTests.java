@@ -100,6 +100,8 @@ class TokenControllerTests {
         assertThat(claims.getJWTID()).isNotBlank();
         Duration ttl = Duration.between(claims.getIssueTime().toInstant(), claims.getExpirationTime().toInstant());
         assertThat(ttl).isEqualTo(Duration.ofHours(8));
+        assertThat(body.get("expiresAt").asString()).as("protocol.md §1 timestamp format")
+                .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.000Z");
         assertThat(Instant.parse(body.get("expiresAt").asString())).isEqualTo(claims.getExpirationTime().toInstant());
     }
 

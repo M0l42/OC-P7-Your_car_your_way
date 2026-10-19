@@ -9,6 +9,8 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HexFormat;
@@ -31,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class TokenController {
 
     private static final Set<String> ROLES = Set.of("customer", "guest", "agent");
+    private static final DateTimeFormatter WIRE_TIME =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
     private static final Pattern SUBJECT = Pattern.compile("[A-Za-z0-9._@-]{1,64}");
 
     private final SigningKey key;
@@ -47,7 +51,8 @@ public class TokenController {
             Integer ttlSeconds) {
     }
 
-    public record TokenResponse(String token, String tokenType, Instant expiresAt, String subject, String role) {
+    /** {@code expiresAt}: ISO-8601 UTC with milliseconds, the contract's timestamp format (protocol.md §1). */
+    public record TokenResponse(String token, String tokenType, String expiresAt, String subject, String role) {
     }
 
     public record ApiError(String code, String reason) {
@@ -103,7 +108,7 @@ public class TokenController {
                 new JWSHeader.Builder(JWSAlgorithm.RS256).type(JOSEObjectType.JWT).keyID(key.keyId()).build(),
                 claims.build());
         jwt.sign(new RSASSASigner(key.privateKey()));
-        return new TokenResponse(jwt.serialize(), "Bearer", expiresAt, subject, role);
+        return new TokenResponse(jwt.serialize(), "Bearer", WIRE_TIME.format(expiresAt), subject, role);
     }
 
     private static void requireMaxLength(String field, String value, int max) {
