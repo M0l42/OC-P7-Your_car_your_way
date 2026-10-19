@@ -17,8 +17,8 @@ chat:
   instance-id: ${INSTANCE_ID:local}
   listener:
     # Dedicated LISTEN connection, separate from the Hikari pool (F9). Compose points chat-2's at
-    # toxiproxy in the O10 region variant.
-    jdbc-url: ${CHAT_LISTENER_JDBC_URL:${spring.datasource.url}}
+    # toxiproxy in the O10 region variant. Blank → the pool's URL (and always the pool's credentials).
+    jdbc-url: ${CHAT_LISTENER_JDBC_URL:}
 
 management:
   endpoints:
@@ -29,6 +29,10 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          # Ready only while LISTEN chat_events is active (A3, O1; ListenerReadiness).
+          include: readinessState,listener
   health:
     livenessstate:
       enabled: true
