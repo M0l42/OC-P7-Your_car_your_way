@@ -60,6 +60,9 @@ interface KillRecord {
 async function main(): Promise<number> {
   log(`chaos run: variant=${variant} base=${baseUrl} gateLatency=${gateLatency}`);
   await waitReady();
+  // A just-(re)created container (chaos-region recreates chat-2) is reachable through nginx only once
+  // nginx re-resolved its IP (resolve, valid=5s, O3); before that the /ws-b pin would fail over to /ws.
+  for (const service of ['chat-1', 'chat-2']) await waitRoutedTo(service);
 
   // ---- 1. setup ------------------------------------------------------------------------------
   const agent = new Participant('agent', 'agent', baseUrl, '/ws-b');
@@ -91,6 +94,9 @@ async function main(): Promise<number> {
   // ---- 2. steady phase (T3) ------------------------------------------------------------------
   log(`steady phase: ${steadyMs / 1000} s, customer → agent every 100 ms, no kills`);
   const steadyStart = performance.now();
+  const crossNow = () => customers.every((c) => c.p.client.instanceId !== null && c.p.client.instanceId !== agent.client.instanceId);
+  const lostBefore = all.reduce((sum, p) => sum + p.lost, 0);
+  const crossAtStart = crossNow();
   let n = 0;
   while (performance.now() - steadyStart < steadyMs) {
     const c = customers[n % customers.length];
@@ -98,7 +104,8 @@ async function main(): Promise<number> {
     await sleep(100);
   }
   const steadySent = n;
-  const steadyCross = customers.every((c) => c.p.client.instanceId !== agent.client.instanceId);
+  // Cross-instance for the WHOLE phase: at start, at end, and no reconnect in between.
+  const steadyCross = crossAtStart && crossNow() && all.reduce((sum, p) => sum + p.lost, 0) === lostBefore;
   log(`steady phase done: ${steadySent} messages`);
 
   // ---- 3. kill phase -------------------------------------------------------------------------
@@ -219,7 +226,7 @@ async function main(): Promise<number> {
     checks.push({ name: `kill phase: ≥${SPEC.messages} messages`, ok: killSent >= SPEC.messages, detail: `${killSent}` });
     checks.push({ name: `kill phase: ≥${SPEC.kills} kill/start`, ok: kills.length >= SPEC.kills, detail: kills.map((k) => k.service).join(' → ') });
   }
-  checks.push({ name: 'steady phase: cross-instance (customers ≠ agent instance)', ok: steadyCross || variant === 'region', detail: steadyCross ? 'yes' : 'no' });
+  checks.push({ name: 'steady phase: cross-instance (customers ≠ agent instance)', ok: steadyCross, detail: steadyCross ? 'yes' : 'no' });
 
   const lat = (phase: Sent['phase']) =>
     latencyStats(
@@ -267,7 +274,21 @@ async function main(): Promise<number> {
   writeFileSync(resolve(outDir, `chaos-${variant}.md`), md);
   writeFileSync(
     resolve(outDir, `chaos-${variant}.json`),
-    JSON.stringify({ variant, ok, steadySent, killSent, total: sent.size, kills, latency: { steady, kills: killLat }, checks }, null, 2),
+    JSON.stringify(
+      {
+        variant,
+        ok,
+        steadySent,
+        killSent,
+        total: sent.size,
+        kills,
+        latency: { steady, kills: killLat },
+        checks,
+        transitions: Object.fromEntries(all.map((p) => [p.name, p.transitions])),
+      },
+      null,
+      2,
+    ),
   );
 
   for (const p of [...all, queueCustomer]) p.client.stop();

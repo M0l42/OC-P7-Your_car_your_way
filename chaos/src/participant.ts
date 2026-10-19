@@ -35,6 +35,8 @@ export class Participant {
   readonly failures: string[] = [];
   /** Instance of every CONNECTED, in order (badge history). */
   readonly instances: string[] = [];
+  /** Every state change with its time (s since process start), for post-mortems in the JSON result. */
+  readonly transitions: string[] = [];
   lost = 0;
   restored = 0;
 
@@ -85,6 +87,7 @@ export class Participant {
           break;
         case 'state':
           if (e.state === 'subscribing' && e.instanceId) this.instances.push(e.instanceId);
+          this.transitions.push(`${(performance.now() / 1000).toFixed(2)} ${e.state}@${e.instanceId ?? '-'}`);
           break;
         case 'connectionLost':
           this.lost++;
