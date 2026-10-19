@@ -66,10 +66,22 @@ Scored with the same method as the other choices in the architecture document (�
   a cross-region connection that must bypass RDS Proxy, because LISTEN pins a session. If the EU
   primary is down, the chat stops in both regions. This is accepted and documented, not hidden.
 - **Measured cross-region latency** (O10): the chaos variant `make chaos-region` adds 80 ms through
-  Toxiproxy on chat-2's pool and listener connections.
-  - NA p95 cross-instance delivery: **TBD**, filled in from the chaos job summary once the
-    cross-region run has been executed.
-  - Reported, not gated.
+  Toxiproxy (downstream direction) on chat-2's pool and listener connections; chat-1 talks to
+  Postgres directly. Five customers on chat-1 send to an agent on chat-2 every 100 ms for 60 s, no
+  kills; latency = agent receive − customer send on one `performance.now()` clock.
+
+  | Run (local compose, 2026-10-19) | Samples | p50 | p95 | max |
+  |---|---|---|---|---|
+  | Simulated NA instance (`make chaos-region`) | 597 | 173.2 ms | **202.9 ms** | 240.5 ms |
+  | Reference, no added latency (`make chaos` steady phase) | 597 | 13.5 ms | 19.2 ms | 31.4 ms |
+
+  - The simulated NA instance adds about 160–185 ms, consistent with two 80 ms crossings: the NOTIFY
+    delivery to chat-2's listener and the load query through its pool.
+  - Both runs: 0 lost, 0 duplicated, 0 out of order, every message acked, database rows match.
+  - Reported, not gated (O5). Measured on develop 791133d with the chaos client of `feat/chaos-client`
+    (4c7d48e).
+  - Caveat: Toxiproxy adds a fixed delay to one direction of a local TCP link. It is not a real
+    transatlantic network: no packet loss, no jitter, no bandwidth limit.
 - **What the PostgreSQL documentation guarantees** ([NOTIFY, PostgreSQL 17][notify-docs]):
   - Notifications are delivered only if the transaction commits, and only between transactions.
     This is what makes "a notification always refers to a committed row" true.
