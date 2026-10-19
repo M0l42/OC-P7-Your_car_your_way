@@ -127,10 +127,12 @@ async function main(): Promise<number> {
           await sleep(3000);
           const s0 = performance.now();
           await start(target);
-          const healthyAfterMs = await waitHealthy(target);
-          const routedAfterMs = (await waitRoutedTo(target)) + healthyAfterMs;
-          log(`${target} healthy after ${Math.round(healthyAfterMs)} ms, served through nginx after ${Math.round(routedAfterMs)} ms`);
-          kills.push({ service: target, killedAt, healthyAfterMs: performance.now() - s0, routedAfterMs });
+          await waitHealthy(target);
+          const healthyAfterMs = performance.now() - s0;
+          await waitRoutedTo(target);
+          const routedAfterMs = performance.now() - s0;
+          log(`${target} healthy ${Math.round(healthyAfterMs)} ms after start, served through nginx after ${Math.round(routedAfterMs)} ms`);
+          kills.push({ service: target, killedAt, healthyAfterMs, routedAfterMs });
         }
       } finally {
         killing = false;
