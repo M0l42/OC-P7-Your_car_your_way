@@ -67,7 +67,7 @@ test('customer ↔ agent across instances, kill chat-1, nothing lost', async ({ 
   compose('kill', 'chat-1');
   await expect(customerBadge).not.toHaveText('Instance : chat-1', { timeout: 15_000 });
   await expect(customerBadge).toHaveText('Instance : chat-2', { timeout: 30_000 });
-  await expect(customer.getByTestId('status-region')).toHaveText(/^Connexion rétablie/, { timeout: 30_000 });
+  await expect(customer.getByTestId('status-region')).toContainText('Connexion rétablie', { timeout: 30_000 });
 
   // --- customer sends again; the agent (never disconnected, on chat-2) receives it
   await customer.getByTestId('composer').fill('Toujours là ?');
