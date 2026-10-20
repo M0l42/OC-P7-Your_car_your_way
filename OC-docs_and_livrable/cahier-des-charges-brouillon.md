@@ -38,6 +38,7 @@ Un client réservant dans un cadre professionnel, avec des besoins potentiels de
 - Ajout d'options/extras à une réservation (ex. siège enfant).
 - Attribut "véhicule adapté" pour les profils à mobilité réduite, utilisable comme critère de recherche.
 - Statut de TVA/exonération fiscale pour les profils professionnels, délégué au prestataire de paiement.
+- Contact du service client par tchat en direct, accessible aux clients connectés comme aux invités (référence de réservation + email), et utilisable au clavier et au lecteur d'écran (cf. §2 Accessibilité).
 
 ## 2. Considérations transverses (AN02)
 
@@ -112,6 +113,21 @@ En tant qu'utilisateur, je veux supprimer mon compte, afin de ne plus avoir de p
 - Given je confirme la suppression avec mon mot de passe, when la suppression est validée, then mes données personnelles et mes identifiants sont supprimés.
 - Given j'ai une réservation en cours ou à venir au moment de la suppression, when la suppression est validée, then mon compte est ramené à un état "invité" : la réservation reste accessible via référence + email, sans accès à un compte complet.
 - Given des données doivent être légalement conservées (ex. historique de facturation), when mon compte est supprimé, then ces données sont conservées pour la durée imposée par la réglementation applicable, sans être rattachées à un profil actif.
+
+**US — Contacter le support par tchat**
+En tant que client (connecté, ou invité via ma référence de réservation + mon email), je veux échanger en direct avec un agent du service client, afin d'obtenir de l'aide sur ma réservation sans passer par un appel téléphonique.
+- Given je suis connecté, ou identifié comme invité par ma référence de réservation + mon email, when j'ouvre une conversation (en indiquant éventuellement une référence de réservation), then la conversation est créée "en attente" et apparaît dans la file des agents.
+- Given ma conversation est prise en charge par un agent, when nous échangeons des messages, then chacun voit les messages de l'autre en direct, dans le même ordre, et chacun de mes messages affiche son état ("envoi…", "envoyé", "non envoyé").
+- Given ma connexion est coupée (réseau, ou panne d'un serveur), when elle est rétablie, then je retrouve automatiquement les messages reçus pendant la coupure et mes messages non confirmés sont renvoyés — aucun message n'est perdu, dupliqué ou affiché dans le désordre.
+- Given j'utilise un lecteur d'écran, when un nouveau message arrive, then il est annoncé ; when la connexion est rétablie, then seul un résumé est annoncé ("Connexion rétablie, N messages récupérés") et non chaque message récupéré un par un.
+- Given ma conversation n'est pas encore prise en charge, when je la clôture, then elle quitte la file des agents.
+
+**US — Prendre en charge une conversation (agent du service client)**
+En tant qu'agent du service client, je veux voir les conversations en attente et en prendre une en charge, afin de répondre aux clients dans l'ordre d'arrivée.
+- Given des conversations sont en attente, when j'ouvre la file, then je les vois de la plus ancienne à la plus récente, mise à jour en direct.
+- Given deux agents prennent en charge la même conversation au même moment, when les deux demandes arrivent, then un seul agent l'obtient ; l'autre est informé qu'elle est déjà prise et elle disparaît de sa file.
+- Given j'ai pris en charge une conversation, when je la clôture, then le client voit qu'elle est clôturée et ne peut plus y écrire.
+- Given je ne suis pas l'agent en charge d'une conversation, when je tente d'y écrire, then ma demande est refusée.
 
 ### Simples, rédigées — à relire/corriger
 

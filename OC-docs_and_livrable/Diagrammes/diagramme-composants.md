@@ -14,7 +14,7 @@
 
 ## Objectif de ce diagramme
 
-Un **diagramme de composants UML**, montrant l'architecture applicative logique du monolithe modulaire : ses modules internes, leurs responsabilités, leurs dépendances mutuelles, et ses interfaces avec l'extérieur (client frontend, service de paiement externe, base de données, service de tchat).
+Un **diagramme de composants UML**, montrant l'architecture applicative logique du monolithe modulaire : ses modules internes, leurs responsabilités, leurs dépendances mutuelles, et ses interfaces avec l'extérieur (client frontend, service de paiement externe, base de données, service de tchat et sa propre base).
 
 Ce diagramme doit rendre visibles deux choses en particulier :
 1. Que l'application est **un seul déployable** (pas des microservices) — les modules sont des frontières logiques internes, pas des services réseau séparés.
@@ -42,7 +42,8 @@ Ce diagramme doit rendre visibles deux choses en particulier :
 **En dehors du monolithe** (composants/systèmes séparés) :
 
 - **Frontend Angular (SPA)** — client consommant l'API du monolithe via HTTPS/REST.
-- **Service Tchat** — composant déployé indépendamment, connexions persistantes (WebSocket), hors périmètre du monolithe.
+- **Service Tchat** — composant déployé indépendamment, connexions persistantes (WebSocket/STOMP), hors périmètre du monolithe. Plusieurs instances, synchronisées par la base (`LISTEN/NOTIFY`).
+- **Base de données `chat`** — base logique PostgreSQL **propre au Service Tchat** (conversations, messages), avec ses propres identifiants et migrations ; hébergée sur la même instance PostgreSQL que la base du monolithe, mais sans aucun lien avec son schéma.
 - **Base de données PostgreSQL** — source de vérité unique, consommée par les modules internes via une couche d'accès aux données (pas de composant interne dédié à représenter séparément, sauf si tu préfères isoler un "Module Accès aux données").
 - **Prestataire de paiement externe (Stripe)** — système tiers, appelé par le Module Paiement ; gère aussi la conversion de devise et le statut TVA/exonération (capacité exacte à vérifier, mais pertinent à montrer comme interface externe).
 
@@ -56,7 +57,10 @@ Ce diagramme doit rendre visibles deux choses en particulier :
 - Module Réservations → Module Paiement (déclenche le paiement à la finalisation d'une réservation)
 - Module Paiement → Prestataire de paiement externe (Stripe) (interface externe, hors monolithe)
 - Tous les modules internes → Base de données PostgreSQL (persistance ; un seul socle de données partagé, pas un schéma par module)
-- Service Tchat : pas de dépendance directe aux modules du monolithe, ni à la base de données (c'est le point à illustrer — il est autonome ; s'il a besoin de contexte comme une référence de réservation, ce sera via un identifiant passé par le client, pas via une intégration directe à représenter ici)
+- Frontend Angular → Service Tchat (WebSocket/STOMP pour le temps réel, REST pour l'historique)
+- Service Tchat → Base de données `chat` (persistance des conversations et messages, et notifications `LISTEN/NOTIFY` entre ses instances)
+- Service Tchat ⇢ Module Utilisateurs & Comptes : **dépendance de confiance uniquement, pas d'appel** — le Service Tchat vérifie les jetons JWT signés par le monolithe avec une clé publique en configuration ; il n'appelle jamais le monolithe à l'exécution (à représenter en pointillé léger avec la note « vérifie les jetons JWT émis par », ou par une simple note si plus lisible)
+- Service Tchat : **aucune dépendance aux modules du monolithe ni à la base du monolithe** (c'est le point à illustrer — il est autonome ; la référence de réservation est un identifiant fourni par le client, pas une intégration directe)
 
 ## Explicitement hors périmètre de ce diagramme
 
@@ -68,7 +72,7 @@ Ce diagramme doit rendre visibles deux choses en particulier :
 
 - Le découpage retenu est bien 4 modules métier (Utilisateurs & Comptes, Catalogue, Réservations, Paiement) + 1 module API.
 - **Agences** est regroupé dans le module Catalogue (pas de module séparé) : il s'agit surtout de données de référence (localisation, rattachement véhicule), sans logique métier propre qui justifierait une frontière dédiée.
-- Le Service Tchat n'a aucune dépendance directe (ni aux modules, ni à la base de données) — il est autonome.
+- Le Service Tchat n'a aucune dépendance directe aux modules du monolithe ni à sa base — il est autonome — mais il **possède sa propre base `chat`** (la persistance des messages avant diffusion est au cœur de sa fiabilité). *(Corrigé à l'étape 4 : la version précédente indiquait « aucune base de données », ce qui contredisait la structure de données demandée pour le tchat.)*
 
 ## Style attendu
 
