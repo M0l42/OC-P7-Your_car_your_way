@@ -73,6 +73,7 @@ Ce diagramme doit rendre visibles deux choses en particulier :
 - Le découpage retenu est bien 4 modules métier (Utilisateurs & Comptes, Catalogue, Réservations, Paiement) + 1 module API.
 - **Agences** est regroupé dans le module Catalogue (pas de module séparé) : il s'agit surtout de données de référence (localisation, rattachement véhicule), sans logique métier propre qui justifierait une frontière dédiée.
 - Le Service Tchat n'a aucune dépendance directe aux modules du monolithe ni à sa base — il est autonome — mais il **possède sa propre base `chat`** (la persistance des messages avant diffusion est au cœur de sa fiabilité). *(Corrigé à l'étape 4 : la version précédente indiquait « aucune base de données », ce qui contredisait la structure de données demandée pour le tchat.)*
+- Le Service Tchat identifie ses utilisateurs par un **jeton JWT signé par le monolithe** (module Utilisateurs & Comptes), qu'il vérifie avec une clé publique en configuration. C'est la seule dépendance au monolithe, et elle est de confiance uniquement : aucun appel à l'exécution : tant que le jeton d'un utilisateur est valide, le tchat fonctionne même si le monolithe est indisponible.
 
 ## Style attendu
 

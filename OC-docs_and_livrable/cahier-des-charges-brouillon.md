@@ -52,7 +52,7 @@ L'ensemble de l'interface (formulaires, résultats de recherche, parcours de pai
 - La suppression d'un compte entraîne la suppression des données personnelles, à l'exception des données dont la conservation est légalement obligatoire (historique de facturation), conservées pour la durée imposée par la réglementation applicable (*durée exacte à vérifier par pays*).
 - L'accès du personnel d'agence aux données clients est limité à leur périmètre géographique/agence (principe du moindre privilège) ; aucun accès global par défaut.
 - Aucune donnée de paiement n'est stockée par l'application : la gestion du paiement est intégralement déléguée à un prestataire externe (Stripe), réduisant d'autant le périmètre de conformité (PCI-DSS notamment).
-- **Point ouvert, à trancher avant l'architecture (étape 3) :** obligation légale ou non de résidence régionale des données selon les pays d'exploitation — à vérifier, ne pas supposer.
+- **Point ouvert, à trancher avant l'architecture (étape 3) :** obligation légale ou non de résidence régionale des données selon les pays d'exploitation — à vérifier, ne pas supposer. *Tranché à l'étape 3 (proposition d'architecture, §2.1 AR01, « Résidence des données ») : pas d'obligation de localisation identifiée dans les 7 pays ; les transferts hors UE sont encadrés (clauses contractuelles types, adéquation canadienne) et une évaluation est requise pour les données des clients québécois (loi 25). Vérification sur sources secondaires, à faire valider par un juriste.*
 
 ### Internationalisation
 

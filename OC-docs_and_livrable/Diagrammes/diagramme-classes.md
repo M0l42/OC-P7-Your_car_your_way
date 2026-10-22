@@ -78,8 +78,8 @@ Un **diagramme de classes UML**, représentant les entités du domaine métier, 
 
 - `Compte` **1** — **0..\*** `Réservation` (un compte, invité ou activé, peut avoir plusieurs réservations)
 - `Réservation` **1** — **1** `Conducteur` (conducteur désigné, par défaut = titulaire du compte)
-- `Réservation` **1** — **1** `Offre` (l'offre réservée)
-- `Offre` **1** — **1** `Véhicule`
+- `Réservation` **\*** — **1** `Offre` (l'offre réservée ; une offre couvre une fenêtre de disponibilité et peut porter plusieurs réservations sur des périodes distinctes)
+- `Offre` **\*** — **1** `Véhicule` (un véhicule apparaît dans plusieurs offres, à des périodes ou entre des agences différentes)
 - `Offre` **\*** — **1** `Agence` (agence de départ)
 - `Offre` **\*** — **1** `Agence` (agence de retour — même classe `Agence`, deux rôles d'association distincts à nommer, ex. `agenceDepart` / `agenceRetour`)
 - `Véhicule` **\*** — **1** `Agence` (agence de rattachement du véhicule)
@@ -98,6 +98,7 @@ Un **diagramme de classes UML**, représentant les entités du domaine métier, 
 
 - `Compte` et `Profil` sont **fusionnés en une seule classe** `Compte`, avec attributs personnels nullables tant que le compte est à l'état invité.
 - `Offre` reste une **entité distincte de `Véhicule`** : cohérent avec les user stories, où une recherche retourne des offres (véhicule + période + tarif + agences), pas des véhicules bruts.
+- Cardinalités `Réservation` **\*** — **1** `Offre` et `Offre` **\*** — **1** `Véhicule` *(corrigées après relecture : la version précédente indiquait 1 — 1 pour les deux, ce qui ne correspondait ni au sens métier ni au schéma SQL ; l'absence de double réservation sur un même véhicule est garantie par une contrainte d'exclusion dans le schéma, §2.4)*.
 - `Offre` porte bien **deux rôles d'association `Agence`** (départ/retour, même classe `Agence`) — nécessaire pour couvrir le cas inter-pays (ville de départ ≠ pays de la ville de retour) ; à bien nommer les rôles dans le diagramme pour éviter toute ambiguïté.
 
 ## Style attendu

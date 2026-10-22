@@ -73,9 +73,10 @@ Dans **chaque région** :
 - Le frontend Angular est servi par un **CDN séparé du backend** (ex. S3 + CloudFront) — déploiement indépendant, pas sur Fargate/ECS avec l'API.
 - **2 régions** : Europe (FR/DE/ES/IT/UK) et Amérique du Nord (CA/US) — pas de granularité plus fine par pays.
 - **Routage global : Amazon Route 53, routage par latence.**
-- **Pipeline CI/CD : GitHub Actions**, cohérent avec le dépôt GitHub déjà requis pour la PoC tchat.
+- **Pipeline CI/CD : GitHub Actions**, retenu après comparaison avec GitLab CI, AWS CodePipeline et Jenkins (proposition d'architecture, §2.2) ; déjà en service sur le dépôt de la PoC tchat.
+- **Un seul primaire, en Europe** : aucune obligation de localisation des données n'a été identifiée dans les 7 pays ; la copie des données vers le réplica nord-américain est un transfert encadré (clauses contractuelles types, adéquation canadienne, évaluation loi 25 pour le Québec). Détail et sources : proposition d'architecture, §2.1 AR01, « Résidence des données ».
 
-Il n'y a plus d'hypothèse ouverte sur ce diagramme — tous les choix de nommage/outillage sont actés ; Claude Design n'a qu'à dessiner la topologie décrite ci-dessus.
+Tous les choix de nommage/outillage sont actés ; Claude Design n'a qu'à dessiner la topologie décrite ci-dessus. Seule hypothèse restante, sans effet sur le dessin : la topologie à primaire unique repose sur une vérification juridique faite sur sources secondaires ; si un pays imposait un jour une localisation, il recevrait son propre primaire (plan de repli documenté en §2.1).
 
 ## Style attendu
 

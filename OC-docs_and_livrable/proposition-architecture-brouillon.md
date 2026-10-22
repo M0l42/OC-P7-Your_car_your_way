@@ -54,7 +54,7 @@
 **Disponibilité**
 - Taux de disponibilité moyen (12 mois) : 97,2 % (FR/DE/ES/IT) contre 98,6-98,9 % (UK/CA/US) — écart cohérent avec des déploiements manuels/une maintenance plus lourde sur OVH (cf. Maintenabilité).
 - Redondance : aucune réplication des instances applicatives (FR/DE/ES/IT) contre réplication partielle (UK/CA) et application containerisée mais base non redondante (US) — absence de redondance = exposition plus forte en cas de panne matérielle.
-- ⚠️ **Incohérence des chiffres à vérifier avec le mentor** : le taux de 97,2 % implique environ 20h d'indisponibilité mensuelle, très supérieur aux 21-28 minutes/mois indiquées plus bas (Fiabilité). Hypothèse retenue pour ce brouillon : le taux de disponibilité inclut les interruptions planifiées (maintenance, déploiements), alors que le chiffre en minutes ne couvre que les incidents non planifiés. À confirmer.
+- ⚠️ **Incohérence des chiffres à vérifier avec le mentor** : le taux de 97,2 % implique environ 20h d'indisponibilité mensuelle, très supérieur aux 21-28 minutes/mois indiquées plus bas (Fiabilité). Hypothèse retenue pour ce brouillon : le taux de disponibilité inclut les interruptions planifiées (maintenance, déploiements), alors que le chiffre en minutes ne couvre que les incidents non planifiés. À confirmer, et l'hypothèse elle-même reste fragile : elle impliquerait environ 20h de maintenance planifiée par mois (2,8 % de ~730h, moins ~25 min d'incidents), ce qui est très élevé même pour des déploiements manuels. Le point reste donc ouvert, et l'une des deux données de l'énoncé est peut-être erronée.
 
 **Fiabilité**
 - Temps moyen d'indisponibilité mensuel (incidents non planifiés, cf. hypothèse ci-dessus) : 21 à 28 min (FR/DE/ES/IT) contre 7 à 16 min (UK/CA/US).
@@ -84,6 +84,8 @@
 | Évolutivité | **Non validé, sur aucun des 4 systèmes** | Même les tentatives de modernisation (CA, US) ne sont jamais sorties du périmètre d'un seul pays ; absence totale de socle de données ou d'API partagé entre marchés. |
 | Sécurité | **Non validé (historique) / partiellement validé (récent)** | FR/DE/ES/IT cumulent les pratiques dépréciées (SHA-1, TLS 1.0, secrets non gérés, 35-41 % de dépendances vulnérables) ; UK/CA/US suivent de meilleures pratiques mais gardent des lacunes (pas de rotation des secrets, KeyVault partiel). |
 
+*Note sur le verdict Sécurité* : deux des constats qui le fondent (hashage SHA-1, TLS 1.0) sont marqués « à vérifier » en §1.3. Le verdict « Non validé » du socle historique tient même s'ils étaient infirmés, car il repose aussi sur des constats non contestés (secrets en fichiers de configuration sans rotation, 35-41 % de dépendances vulnérables) ; il serait en revanche à nuancer dans sa justification.
+
 **Synthèse** : aucun des quatre systèmes existants ne satisfait pleinement les critères retenus. Le socle historique (FR/DE/ES/IT) échoue sur la quasi-totalité d'entre eux. Les systèmes plus récents (UK, CA, US) se comportent nettement mieux sur les critères opérationnels (performance, disponibilité, fiabilité, sécurité), mais échouent eux aussi sur le critère le plus déterminant pour cette mission — l'évolutivité : aucun n'a jamais réussi à s'étendre au-delà d'un seul pays, faute de socle de données ou d'API partagé. Cela confirme qu'il ne s'agit pas de corriger ou d'étendre l'un des systèmes actuels, mais de concevoir une architecture cible commune, pensée dès le départ pour l'ensemble des marchés.
 
 ---
@@ -101,6 +103,7 @@
 - Recherche et réservation inter-pays (ville de départ ≠ pays de la ville de retour).
 - Devise déterminée par le pays de la ville de départ ; conversion déléguée au prestataire de paiement.
 - Interface multilingue (socle FR/EN/DE/ES/IT), conçue pour permettre l'ajout de langues sans refonte.
+- **Point ouvert (repris du cahier des charges, AN02)** : obligations linguistiques propres à certaines juridictions, en particulier au Québec (Charte de la langue française, renforcée par la loi 96 en 2022), à vérifier avant l'ouverture du marché CA. Le socle multilingue couvre déjà le français ; l'enjeu porte sur les obligations éventuelles (français par défaut, documents contractuels en français), pas sur l'architecture.
 
 **Accessibilité**
 - Conformité aux standards d'accessibilité (WCAG/RGAA) sur l'ensemble du parcours : navigation clavier, compatibilité lecteur d'écran, structure sémantique.
@@ -115,7 +118,16 @@
 
 **Données et architecture globale**
 - Un socle de données logiquement unifié (remplace les 4 schémas divergents actuels) — condition nécessaire à la recherche/réservation inter-pays et à l'évolutivité (cf. audit AU04).
-- Les données (comptes, réservations, catalogue véhicules/offres) doivent rester accessibles globalement, quelle que soit la région de l'utilisateur ou du serveur qui traite la requête — la distribution géographique des serveurs ne doit pas fragmenter les données en silos régionaux (cf. discussion §2.1 ci-dessus).
+- Les données (comptes, réservations, catalogue véhicules/offres) doivent rester accessibles globalement, quelle que soit la région de l'utilisateur ou du serveur qui traite la requête — la distribution géographique des serveurs ne doit pas fragmenter les données en silos régionaux (cf. résidence des données ci-dessous).
+- **Résidence des données (point ouvert du cahier des charges AN02, tranché ici).** La topologie retenue (un seul primaire PostgreSQL en Europe, un réplica en lecture en Amérique du Nord, §2.2) suppose qu'aucune obligation légale n'impose de stocker les données d'un pays dans ce pays. Vérification faite le 22/10/2026 :
+  - **Pas d'obligation de localisation identifiée** pour une entreprise privée de location dans les 7 pays. Le RGPD (UE) et le UK GDPR n'imposent pas de stockage en Europe : ils encadrent les *transferts* hors de leur territoire (chapitre V du RGPD, articles 44 à 49). Au Canada, la loi fédérale PIPEDA ne fixe pas d'obligation de localisation : elle repose sur la responsabilité de l'organisation, qui doit garantir par contrat un niveau de protection comparable lorsque les données sont traitées ailleurs [OPC]. Pas de règle fédérale de localisation aux États-Unis pour ce type de données.
+  - **Choix de conception, au-delà du droit** : cloisonner les données par pays ou par région rendrait l'exploitation lourde (un schéma et des sauvegardes par pays, des migrations à synchroniser) et casserait l'usage normal du service : un client européen qui loue aux États-Unis, ou l'inverse, doit retrouver son compte et ses réservations. C'est précisément le défaut de l'existant (§1.3, silos par pays).
+  - **Conditions à respecter** (le réplica nord-américain reçoit une copie des données des clients européens, ce qui constitue un transfert au sens du RGPD) :
+    1. *Vers les États-Unis* : clauses contractuelles types de la Commission européenne, intégrées à l'avenant RGPD d'AWS (Data Processing Addendum) [AWS-SCC]. AWS déclare aussi participer au EU-US Data Privacy Framework et à son extension britannique [AWS-DPF, ICO], mais ce cadre n'est pas retenu comme fondement unique : confirmé par le Tribunal de l'UE en septembre 2025, il fait l'objet d'un pourvoi devant la CJUE (C-703/25 P), et le CEPD a demandé en juillet 2026 son réexamen à la suite de la décision de la Cour suprême américaine Trump v. Slaughter [DPF-1, DPF-2].
+    2. *Vers le Canada* (si le réplica est placé dans une région AWS canadienne) : décision d'adéquation de la Commission européenne, confirmée lors de sa revue de janvier 2024 [CA-ADQ].
+    3. *Québec (loi 25, article 17)* : une évaluation des facteurs relatifs à la vie privée est obligatoire avant de communiquer hors du Québec des renseignements personnels qui y ont été recueillis, y compris lorsqu'ils sont confiés à un prestataire. C'est le cas ici (primaire en Europe). La Commission d'accès à l'information publie un guide et un modèle pour cette évaluation [QC-25].
+  - **Plan de repli** si un pays impose un jour une localisation : un primaire régional pour ce pays (le schéma est commun, seule la topologie change), et, pour le tchat, la bascule vers Redis pub/sub déjà documentée comme critère de réouverture (§2.2, diffusion temps réel).
+  - *Sources consultées le 22/10/2026, essentiellement secondaires (cabinets d'avocats, éditeurs, pages des fournisseurs) : à faire valider par un juriste avant mise en production.* [OPC] [Commissariat à la protection de la vie privée du Canada, lignes directrices sur le traitement transfrontalier](https://www.priv.gc.ca/en/privacy-topics/personal-information-transferred-across-borders/gl_dab_090127/) ; [Torys, 2019](https://www.torys.com/en/our-latest-thinking/publications/2019/09/opc-not-changing-guidelines-on-transfers-for-processing). [AWS-SCC] [AWS Security Blog, clauses contractuelles types dans le DPA AWS](https://aws.amazon.com/blogs/security/new-standard-contractual-clauses-now-part-of-the-aws-gdpr-data-processing-addendum-for-customers). [AWS-DPF] [Amazon, participation au DPF](https://digprjsurvey.amazon.com/csad/help/node/G202135380) (statut actif à vérifier sur dataprivacyframework.gov). [ICO] [ICO, UK Extension du DPF](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/international-transfers/adequacy-regulations/how-does-the-uk-extension-to-the-eu-us-data-privacy-framework-work). [DPF-1] [Skadden, 07/2026](https://www.skadden.com/insights/publications/2026/07/supreme-court-decision-raises-new-questions) ; [DPF-2] [Hunton, avis du CEPD](https://www.hunton.com/privacy-and-cybersecurity-law-blog/edpb-calls-for-review-of-eu-u-s-data-privacy-framework-after-u-s-supreme-court-decision-on-ftc-independence). [CA-ADQ] [WeirFoulds, revue de l'adéquation canadienne](https://www.weirfoulds.com/canadas-privacy-protections-stand-strong) ; [McMillan](https://mcmillan.ca/insights/publications/privacy-on-ice-canada-maintains-gdpr-adequacy-status-despite-frozen-privacy-reforms/). [QC-25] [McCarthy Tétrault, guide de la CAI sur les évaluations de la loi 25](https://www.mccarthy.ca/en/insights/blogs/techlex/quebec-privacy-regulators-guide-law-25-compliant-privacy-impact-assessments) ; [IAPP](https://iapp.org/news/a/iapp-cps-23-forthcoming-quebec-privacy-regulations-situate-province-between-canada-and-europe).
 
 **API**
 - API exposant les données (utilisateurs, réservations, véhicules...) avec opérations CRUD par domaine, pour les applications utilisées en agence (déjà requis au cahier des charges).
@@ -266,7 +278,7 @@ Candidats évalués : AWS, Microsoft Azure, Google Cloud Platform, OVHcloud. Sca
 Critères :
 1. Couverture géographique (Europe + Amérique du Nord) — nécessaire pour les réplicas régionaux déjà décidés pour PostgreSQL.
 2. Service PostgreSQL managé.
-3. Conformité réglementaire / certifications (RGPD, résidence des données — point « à vérifier » noté en AN02/AR01).
+3. Conformité réglementaire / certifications (RGPD, encadrement des transferts de données hors UE). *(Au moment de la notation, la résidence des données était encore un point ouvert ; elle a été tranchée depuis en §2.1 AR01 : pas d'obligation de localisation identifiée, transferts encadrés par les clauses contractuelles types du DPA AWS. Ce critère ne change donc pas le classement.)*
 4. Maturité des plateformes de conteneurs serverless (sans gestion de cluster) — corrige directement la faiblesse de déploiements manuels/fragiles identifiée à l'audit (§1.3). *(Critère reformulé après coup : la première version demandait la maturité Kubernetes managé, avant que le choix d'orchestration — ci-dessous — n'écarte explicitement Kubernetes au profit d'une plateforme de conteneurs serverless sans cluster. Les deux évaluations ont été refaites sur la bonne base.)*
 5. Maturité / part de marché générale.
 
@@ -295,6 +307,27 @@ Le critère organisationnel ne renverse pas le classement technique : l'avantage
 **Décision : AWS.**
 
 Justification : meilleur score sur les deux évaluations indépendantes, et seul le classement est resté identique entre les deux (contrairement au choix du framework frontend) — signal de robustesse plus fort. Déjà utilisé en production sur deux des quatre systèmes existants (UK, CA), ce qui confirme une compétence déjà disponible en interne.
+
+**Choix de l'outil d'intégration et de déploiement continus (CI/CD)**
+
+La faiblesse identifiée à l'audit (§1.3 : déploiements manuels, 82 % de réussite, stabilisation en 3,4 jours) est corrigée par le fait d'automatiser les déploiements, quel que soit l'outil. Le choix de l'outil pèse donc moins que les choix précédents, et il est réversible : un pipeline se résume à quelques fichiers de configuration, et le contrat entre le pipeline et la plateforme est l'image Docker poussée dans le registre (Amazon ECR). Il est noté avec la même grille, en une seule évaluation interne, ce niveau de rigueur étant proportionné à un choix réversible.
+
+Candidats évalués : (A) GitHub Actions ; (B) GitLab CI ; (C) AWS CodePipeline + CodeBuild ; (D) Jenkins auto-hébergé.
+
+| Critère | A. GitHub Actions | B. GitLab CI | C. AWS CodePipeline | D. Jenkins |
+|---|---|---|---|---|
+| Intégration au dépôt de code (GitHub) | 10 | 4 | 7 | 6 |
+| Déploiement vers ECR / ECS Fargate | 8 | 8 | 10 | 7 |
+| Charge opérationnelle (service hébergé) | 9 | 8 | 9 | 3 |
+| Portabilité / évitement du lock-in | 6 | 7 | 3 | 9 |
+| Maturité / écosystème | 9 | 8 | 7 | 9 |
+| **Total /50** | **42** | **35** | **36** | **34** |
+
+Lecture des notes : GitLab CI suppose de migrer ou de dupliquer le dépôt ; CodePipeline s'intègre le mieux à ECS mais lie aussi le pipeline à AWS, en plus de l'hébergement ; Jenkins est le plus portable mais réintroduit un serveur à opérer et à maintenir, soit le type de charge manuelle que l'audit reproche à l'existant.
+
+Critère organisationnel (priorité 2) : GitHub Actions est déjà en service sur le dépôt de la PoC tchat (étape 4), avec deux pipelines : tests à chaque modification (`ci.yml`) et test de chaos qui coupe des instances en cours de conversation (`chaos.yml`).
+
+**Décision : GitHub Actions.**
 
 **Choix de la diffusion temps réel du Service Tchat entre instances (fan-out)**
 
@@ -326,7 +359,7 @@ Lecture des notes :
 **Décision : PostgreSQL `LISTEN/NOTIFY`, Redis pub/sub documenté comme alternative.**
 
 Points de vigilance documentés :
-- **Pas de bascule régionale pour le tchat.** Les notifications n'existent que sur le primaire : les réplicas en lecture ne les reçoivent pas. Les instances Tchat d'Amérique du Nord écoutent donc le primaire européen, par une connexion inter-régions directe (pas via RDS Proxy, car `LISTEN` fixe la session). Si le primaire européen tombe, le tchat s'arrête dans les deux régions — limite assumée, cohérente avec le choix d'un seul primaire faisant autorité.
+- **Pas de bascule régionale pour le tchat.** Les notifications n'existent que sur le primaire : les réplicas en lecture ne les reçoivent pas. Les instances Tchat d'Amérique du Nord écoutent donc le primaire européen, par une connexion inter-régions directe (pas via RDS Proxy, car `LISTEN` fixe la session). Si le primaire européen tombe, le tchat s'arrête dans les deux régions — limite assumée, cohérente avec le choix d'un seul primaire faisant autorité. Les conversations des clients nord-américains sont donc stockées en Europe : même cadre juridique que le reste des données (§2.1, résidence des données), y compris l'évaluation exigée par la loi 25 pour les clients québécois.
 - **Limite de montée en charge.** À la validation, une transaction qui a émis `NOTIFY` prend un verrou global à l'instance PostgreSQL : les validations qui notifient sont sérialisées. C'est sans effet au débit d'un support client, mais fixe le **critère de réouverture vers Redis** : un trafic soutenu au-delà d'environ 100 messages/s par région (hypothèse à valider par mesure), un besoin de présence ou d'indicateur de saisie, ou un besoin de diffusion régionale indépendante du primaire. *(Sources : documentation PostgreSQL 17 et retours d'expérience publiés, consultés via résultats de recherche — détail et liens dans l'ADR-002 du dépôt de la PoC.)*
 
 Validation par la PoC (étape 4, mesures locales Docker Compose du 19/10/2026) : sur 2 234 messages avec 4 arrêts brutaux d'instance, 0 message perdu, dupliqué ou désordonné ; latence entre instances p95 de 18,9 ms en régime établi ; 204,3 ms en simulant une instance nord-américaine (+80 ms ajoutés sur ses connexions à la base) — à confirmer sur un vrai réseau transatlantique.
@@ -370,18 +403,22 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 | Table | Colonnes | Clés / contraintes |
 |---|---|---|
 | `vehicule` | `id`, `identifiant`, `categorie_acriss`, `accessible` (booléen), `agence_id` | PK `id` ; `identifiant` UNIQUE NOT NULL ; FK `agence_id` → `agence(id)` NOT NULL (rattachement) |
-| `offre` | `id`, `vehicule_id`, `agence_depart_id`, `agence_retour_id`, `tarif`, `date_debut_disponibilite`, `date_fin_disponibilite` | PK `id` ; FK `vehicule_id` → `vehicule(id)` NOT NULL ; FK `agence_depart_id` → `agence(id)` NOT NULL ; FK `agence_retour_id` → `agence(id)` NOT NULL (peuvent référencer la même agence ou deux agences différentes, y compris de pays différents) |
+| `offre` | `id`, `vehicule_id`, `agence_depart_id`, `agence_retour_id`, `tarif`, `date_debut_disponibilite`, `date_fin_disponibilite` | PK `id` ; FK `vehicule_id` → `vehicule(id)` NOT NULL (un véhicule peut figurer dans plusieurs offres) ; UNIQUE (`id`, `vehicule_id`) (cible de la FK composite de `reservation`) ; FK `agence_depart_id` → `agence(id)` NOT NULL ; FK `agence_retour_id` → `agence(id)` NOT NULL (peuvent référencer la même agence ou deux agences différentes, y compris de pays différents) |
 
 **Réservations et extras**
 
 | Table | Colonnes | Clés / contraintes |
 |---|---|---|
-| `reservation` | `id`, `reference`, `compte_id`, `offre_id`, `paiement_id`, `conducteur_id`, `date_debut`, `date_fin`, `ville_depart`, `ville_retour`, `devise`, `statut` (`statut_reservation`), `montant_total` | PK `id` ; `reference` UNIQUE NOT NULL (accès invité par référence + email) ; FK `compte_id` → `compte(id)` NOT NULL ; FK `offre_id` → `offre(id)` NOT NULL ; FK `paiement_id` → `paiement(id)` UNIQUE NOT NULL ; FK `conducteur_id` → `conducteur(id)` UNIQUE NOT NULL |
+| `reservation` | `id`, `reference`, `compte_id`, `offre_id`, `vehicule_id`, `paiement_id`, `conducteur_id`, `date_debut`, `date_fin`, `ville_depart`, `ville_retour`, `devise`, `statut` (`statut_reservation`), `montant_total` | PK `id` ; `reference` UNIQUE NOT NULL (accès invité par référence + email) ; FK `compte_id` → `compte(id)` NOT NULL ; FK composite (`offre_id`, `vehicule_id`) → `offre(id, vehicule_id)` NOT NULL (une offre peut porter plusieurs réservations sur des périodes distinctes ; le véhicule recopié est forcément celui de l'offre) ; `EXCLUDE USING gist (vehicule_id WITH =, tstzrange(date_debut, date_fin, '[)') WITH &&) WHERE (statut <> 'annulee')` — aucune réservation active ne peut chevaucher une autre sur le même véhicule ; FK `paiement_id` → `paiement(id)` UNIQUE NOT NULL ; FK `conducteur_id` → `conducteur(id)` UNIQUE NOT NULL |
 | `conducteur` | `id`, `nom`, `prenom`, `date_naissance` | PK `id` — pas de FK vers `compte` : simple snapshot de données saisies à la réservation, pas un profil réutilisable |
 | `extra` | `id`, `type`, `tarif` | PK `id` |
 | `reservation_extra` | `reservation_id`, `extra_id`, `quantite` | PK composite (`reservation_id`, `extra_id`) ; FK `reservation_id` → `reservation(id)` ; FK `extra_id` → `extra(id)` |
 
 *Point de vigilance documenté* : `ville_depart`/`ville_retour` sont stockées directement sur `reservation` (plutôt que recalculées depuis `offre` → `agence`), en snapshot au moment de la réservation — cohérent avec le diagramme de classes validé. Choix volontaire : la ville affichée sur une réservation passée ne doit pas changer si les données de l'agence associée sont corrigées ultérieurement.
+
+*Point de vigilance documenté — pas de double réservation* : c'est l'argument central du choix de PostgreSQL (§2.2), il est donc garanti par le schéma et non par le seul code applicatif. `vehicule_id` est recopié de l'offre sur `reservation` (la FK composite interdit toute incohérence entre les deux), ce qui permet une contrainte d'exclusion PostgreSQL : deux réservations non annulées ne peuvent pas porter sur le même véhicule avec des périodes qui se chevauchent, même si elles sont validées en même temps par deux instances. La contrainte nécessite l'extension `btree_gist` (disponible sur Amazon RDS) et suppose `date_debut`/`date_fin` en `timestamptz` ; une réservation annulée libère le créneau. Le fait que la période réservée reste dans la fenêtre de disponibilité de l'offre est vérifié par l'application à la réservation.
+
+*Simplification volontaire — extras* : le catalogue d'`extra` est commun à toutes les agences et tous les pays (un siège enfant est supposé disponible partout). Si la disponibilité ou le tarif d'un extra varie selon l'agence, une table de liaison `agence_extra` (disponibilité, tarif local) s'ajoutera sans modifier les tables existantes.
 
 **Paiement**
 
@@ -399,6 +436,7 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 - `compte(email)` — recherche de compte à la connexion et à l'activation.
 - `reservation(reference, compte_id)` — accès invité par référence + email, et historique des réservations d'un compte.
 - `offre(agence_depart_id, agence_retour_id, date_debut_disponibilite, date_fin_disponibilite)` — recherche d'offre par ville/période (US "Rechercher une offre").
+- Index GiST de la contrainte d'exclusion `reservation(vehicule_id, période)` — créé par la contrainte elle-même ; sert aussi à vérifier rapidement si un véhicule est libre sur une période.
 - `vehicule(categorie_acriss, accessible)` — filtre véhicule adapté/catégorie ACRISS.
 - `personnel_agence(agence_id)` — application du scope d'accès par agence/région (moindre privilège, §2.1 AR01).
 
