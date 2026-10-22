@@ -296,6 +296,41 @@ Le critère organisationnel ne renverse pas le classement technique : l'avantage
 
 Justification : meilleur score sur les deux évaluations indépendantes, et seul le classement est resté identique entre les deux (contrairement au choix du framework frontend) — signal de robustesse plus fort. Déjà utilisé en production sur deux des quatre systèmes existants (UK, CA), ce qui confirme une compétence déjà disponible en interne.
 
+**Choix de la diffusion temps réel du Service Tchat entre instances (fan-out)**
+
+Le Service Tchat tourne en plusieurs instances derrière un load balancer (redondance, §2.2 conteneurisation). Le broker STOMP intégré à Spring est en mémoire : il ne joint que les clients connectés à la même instance. Un client connecté à l'instance A et un agent connecté à l'instance B doivent pourtant se voir mutuellement, et la perte d'une instance ne doit faire perdre, dupliquer ni désordonner aucun message.
+
+Principe retenu en amont du choix : **la fiabilité repose sur la base de données, pas sur le transport.** Chaque message est d'abord enregistré en base avec un numéro de séquence sans trou propre à sa conversation (`conversation.last_seq`, incrémenté sous verrou de ligne dans la même transaction que l'insertion — voir §2.4) ; un client qui se reconnecte redemande « tout ce qui suit la séquence N ». Le mécanisme de diffusion n'a donc pas besoin d'être durable : il doit être rapide et ne jamais annoncer un message qui n'est pas encore enregistré.
+
+Candidats évalués : (A) broker Spring en mémoire seul, une seule instance ; (B) relais STOMP vers un broker externe RabbitMQ ; (C) Redis pub/sub (Amazon ElastiCache) ; (D) PostgreSQL `LISTEN/NOTIFY`, sur la base déjà en place.
+
+Critères : (1) fonctionnement multi-instances ; (2) cohérence avec la base — la notification ne peut pas précéder l'enregistrement du message ; (3) infrastructure et charge opérationnelle supplémentaires ; (4) montée en charge au volume attendu (support client : faible débit par région) ; (5) fonctionnement multi-région sans dépendre de la région primaire ; (6) maturité / intégration Spring.
+
+Méthode : même grille de notation de 1 à 10 que pour les autres choix, en une seule évaluation interne (ce choix est apparu à l'étape 4, après les évaluations croisées des autres choix), puis confrontée aux mesures de la PoC.
+
+| Critère | A. Broker en mémoire seul | B. Relais RabbitMQ | C. Redis pub/sub | D. PostgreSQL LISTEN/NOTIFY |
+|---|---|---|---|---|
+| Fonctionnement multi-instances | 1 | 10 | 9 | 9 |
+| Cohérence avec la base (notification après enregistrement) | 3 | 5 | 5 | 10 |
+| Infrastructure / charge opérationnelle | 10 | 3 | 7 | 9 |
+| Montée en charge au volume attendu | 2 | 9 | 9 | 8 |
+| Multi-région sans dépendre du primaire | 2 | 7 | 6 | 4 |
+| Maturité / intégration Spring | 9 | 9 | 8 | 6 |
+| **Total /60** | **27** | **43** | **44** | **46** |
+
+Lecture des notes :
+- **A** ne démontre rien de l'exigence multi-instances : écarté.
+- **B et C** obligent à écrire le message à deux endroits (base, puis broker) : si l'instance tombe entre les deux, la diffusion est perdue et seule la reprise par la base la rattrape. RabbitMQ ajoute en plus un cluster à opérer, sécuriser et surveiller, disproportionné pour ce volume.
+- **D** est transactionnel : PostgreSQL ne délivre une notification que si la transaction qui l'a émise est validée. Aucune notification ne peut donc annoncer un message absent de la base, et aucune infrastructure n'est ajoutée (une connexion dédiée par instance).
+
+**Décision : PostgreSQL `LISTEN/NOTIFY`, Redis pub/sub documenté comme alternative.**
+
+Points de vigilance documentés :
+- **Pas de bascule régionale pour le tchat.** Les notifications n'existent que sur le primaire : les réplicas en lecture ne les reçoivent pas. Les instances Tchat d'Amérique du Nord écoutent donc le primaire européen, par une connexion inter-régions directe (pas via RDS Proxy, car `LISTEN` fixe la session). Si le primaire européen tombe, le tchat s'arrête dans les deux régions — limite assumée, cohérente avec le choix d'un seul primaire faisant autorité.
+- **Limite de montée en charge.** À la validation, une transaction qui a émis `NOTIFY` prend un verrou global à l'instance PostgreSQL : les validations qui notifient sont sérialisées. C'est sans effet au débit d'un support client, mais fixe le **critère de réouverture vers Redis** : un trafic soutenu au-delà d'environ 100 messages/s par région (hypothèse à valider par mesure), un besoin de présence ou d'indicateur de saisie, ou un besoin de diffusion régionale indépendante du primaire. *(Sources : documentation PostgreSQL 17 et retours d'expérience publiés, consultés via résultats de recherche — détail et liens dans l'ADR-002 du dépôt de la PoC.)*
+
+Validation par la PoC (étape 4, mesures locales Docker Compose du 19/10/2026) : sur 2 234 messages avec 4 arrêts brutaux d'instance, 0 message perdu, dupliqué ou désordonné ; latence entre instances p95 de 18,9 ms en régime établi ; 204,3 ms en simulant une instance nord-américaine (+80 ms ajoutés sur ses connexions à la base) — à confirmer sur un vrai réseau transatlantique.
+
 ### 2.3 Modélisation UML (AR03)
 
 Conformément à la recommandation de la mission (« Utilisez des diagrammes UML adaptés (composants, déploiement, classes) »), trois diagrammes ont été produits, chacun reprenant directement les décisions actées en §2.2 (AR02).
@@ -304,19 +339,19 @@ Conformément à la recommandation de la mission (« Utilisez des diagrammes UML
 
 ![Diagramme de composants](Diagrammes/diagramme-composants.png)
 
-Illustre le découpage interne du monolithe modulaire DDD (modules Utilisateurs & Comptes, Réservations, Catalogue, Paiement, Accès aux données), exposés via un module API consommé par le frontend Angular et les applications d'agence. Montre explicitement que le Service Tchat est la seule extraction en service indépendant, sans dépendance au monolithe ni à la base de données — cohérent avec le choix de conteneurisation (§2.2).
+Illustre le découpage interne du monolithe modulaire DDD (modules Utilisateurs & Comptes, Réservations, Catalogue, Paiement, Accès aux données), exposés via un module API consommé par le frontend Angular et les applications d'agence. Montre explicitement que le Service Tchat est la seule extraction en service indépendant, sans dépendance aux modules du monolithe ni à son schéma : il possède sa propre base logique `chat` (identifiants et migrations propres), et identifie ses utilisateurs par un jeton JWT signé par le monolithe, sans jamais l'appeler à l'exécution — cohérent avec le choix de conteneurisation (§2.2). Ses instances se synchronisent par `LISTEN/NOTIFY` sur cette base (§2.2, diffusion temps réel).
 
 **Diagramme de déploiement**
 
 ![Diagramme de déploiement](Diagrammes/diagramme-deploiement.png)
 
-Illustre la topologie AWS cible : le même artefact applicatif (monolithe) déployé en plusieurs instances redondantes dans deux régions (Europe, Amérique du Nord), derrière un routage global à latence minimale (Amazon Route 53), sur des conteneurs managés sans cluster (Fargate/ECS) — conforme aux choix d'hébergement et de conteneurisation (§2.2). Un seul socle PostgreSQL fait autorité (primaire en Europe, réplica en lecture en Amérique du Nord), le frontend Angular est servi indépendamment via un CDN (CloudFront + S3), et le déploiement est entièrement automatisé (pipeline GitHub Actions), pour le monolithe comme pour le service Tchat.
+Illustre la topologie AWS cible : le même artefact applicatif (monolithe) déployé en plusieurs instances redondantes dans deux régions (Europe, Amérique du Nord), derrière un routage global à latence minimale (Amazon Route 53), sur des conteneurs managés sans cluster (Fargate/ECS) — conforme aux choix d'hébergement et de conteneurisation (§2.2). Un seul socle PostgreSQL fait autorité (primaire en Europe, réplica en lecture en Amérique du Nord), le frontend Angular est servi indépendamment via un CDN (CloudFront + S3), et le déploiement est entièrement automatisé (pipeline GitHub Actions), pour le monolithe comme pour le service Tchat. La base `chat` du Service Tchat est hébergée sur la même instance RDS (aucune infrastructure supplémentaire) ; les instances Tchat d'Amérique du Nord écoutent les notifications sur le primaire européen, les réplicas en lecture ne les recevant pas (§2.2).
 
 **Diagramme de classes**
 
 ![Diagramme de classes](Diagrammes/diagramme-classes.png)
 
-Modélise le domaine métier central (Compte, Réservation, Conducteur, Offre, Véhicule, Agence, Extra, Paiement, PersonnelAgence) et les règles métier actées au cahier des charges (mécanisme invité/activé, conducteur distinct du réservataire, réservation inter-pays via deux rôles d'agence départ/retour, délais de modification/annulation, remboursement partiel). Sert de base au modèle de données relationnel détaillé en §2.4 (AR04).
+Modélise le domaine métier central (Compte, Réservation, Conducteur, Offre, Véhicule, Agence, Extra, Paiement, PersonnelAgence) et les règles métier actées au cahier des charges (mécanisme invité/activé, conducteur distinct du réservataire, réservation inter-pays via deux rôles d'agence départ/retour, délais de modification/annulation, remboursement partiel). Sert de base au modèle de données relationnel détaillé en §2.4 (AR04). Un paquetage séparé représente le domaine du Service Tchat (Conversation, Message), sans association vers le domaine du monolithe : le tchat ne connaît le client et la réservation que par leurs identifiants.
 
 ### 2.4 Modèle de données (AR04)
 
@@ -366,3 +401,26 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 - `offre(agence_depart_id, agence_retour_id, date_debut_disponibilite, date_fin_disponibilite)` — recherche d'offre par ville/période (US "Rechercher une offre").
 - `vehicule(categorie_acriss, accessible)` — filtre véhicule adapté/catégorie ACRISS.
 - `personnel_agence(agence_id)` — application du scope d'accès par agence/région (moindre privilège, §2.1 AR01).
+
+**Service Tchat (base `chat`, propre au service)**
+
+Base logique distincte, sur la même instance RDS, possédée par le seul Service Tchat (ses migrations vivent avec son code). Mêmes conventions que ci-dessus (`BIGSERIAL`, `snake_case`, énumérations natives aux valeurs en français). **Aucune clé étrangère vers la base du monolithe** : `customer_ref` et `agent_ref` reprennent l'identifiant (`sub`) du jeton JWT, `reservation_reference` est un identifiant fourni par le client.
+
+| Table | Colonnes | Clés / contraintes |
+|---|---|---|
+| `conversation` | `id`, `customer_ref`, `customer_kind` (`type_client`), `reservation_reference` (nul), `status` (`statut_conversation`), `agent_ref` (nul), `client_request_id`, `last_seq`, `created_at`, `claimed_at` (nul), `closed_at` (nul) | PK `id` ; `agent_ref` NOT NULL quand `status = 'en_cours'` (un client peut clôturer une conversation non prise en charge) ; `last_seq` ≥ 0 ; UNIQUE (`customer_ref`, `client_request_id`) — l'ouverture d'une conversation est idempotente en cas de renvoi |
+| `message` | `conversation_id`, `seq`, `client_message_id`, `type` (`type_message`), `sender_role` (`role_emetteur`), `sender_ref`, `content` (nul), `created_at` | PK composite (`conversation_id`, `seq`) ; FK `conversation_id` → `conversation(id)` ; `seq` ≥ 1 ; UNIQUE (`conversation_id`, `client_message_id`) — un message renvoyé n'est jamais enregistré deux fois ; `texte` : contenu de 1 à 2 000 caractères, émetteur `client` ou `agent` ; événements système (`prise_en_charge`, `cloture`) : émetteur `systeme`, contenu nul |
+
+*Point de vigilance documenté* : l'ordre des messages ne repose pas sur un identifiant global `BIGSERIAL`. Deux transactions concurrentes peuvent rendre leurs lignes visibles dans un ordre différent de celui de leurs identifiants, et un client qui reprend « après l'identifiant N » manquerait alors un message. Le numéro `seq` est attribué par `conversation.last_seq + 1` sous verrou de la ligne `conversation`, dans la même transaction que l'insertion du message : l'ordre des `seq` est l'ordre de validation, sans trou. Ce scénario est reproduit par un test de la PoC (le `BIGSERIAL` manque une ligne, la séquence par conversation jamais).
+
+**Énumérations du Service Tchat**
+
+- `type_client` : `compte`, `invite`
+- `statut_conversation` : `en_attente`, `en_cours`, `cloturee`
+- `type_message` : `texte`, `prise_en_charge`, `cloture`
+- `role_emetteur` : `client`, `agent`, `systeme`
+
+**Index du Service Tchat** :
+- `conversation(status, created_at)` — file des agents, conversations en attente de la plus ancienne à la plus récente (US "Prendre en charge une conversation").
+- `conversation(agent_ref)` (partiel, `agent_ref` non nul) — conversations d'un agent.
+- La reprise après reconnexion (« messages de la conversation après `seq` N ») est servie par la clé primaire (`conversation_id`, `seq`).
