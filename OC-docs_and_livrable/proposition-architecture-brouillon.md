@@ -162,13 +162,13 @@ Méthode : notation de 1 (mauvais) à 10 (excellent) par critère, sur l'adéqua
 
 | Critère | Spring Boot | .NET | NestJS | Laravel | Django |
 |---|---|---|---|---|---|
-| Modularité / DDD | 9 | 8 | 8 | 4 | 4 |
-| Support i18n | 9 | 9 | 5 | 8 | 9 |
-| Hashage de mot de passe moderne | 9 | 7 | 5 | 9 | 8 |
-| Maturité | 9 | 8 | 5 | 7 | 9 |
-| Typage statique | 10 | 10 | 8 | 3 | 3 |
-| Modèle de concurrence (charge I/O-bound) | 7 | 9 | 9 | 5 | 5 |
-| ORM / accès aux données | 9 | 9 | 5 | 10 | 10 |
+| Modularité / DDD | 9 — Spring Modulith, frontières vérifiées à la compilation | 8 — assemblies + analyseurs Roslyn | 8 — modules imposés, frontières non vérifiées | 4 — aucune frontière imposée, dépend de la discipline | 4 — "apps" permettent une bonne modularité si suivies, non imposée |
+| Support i18n | 9 — `MessageSource` intégré, mature | 9 — `System.Globalization` intégré, mature | 5 — pas de module officiel, packages tiers variables | 8 — natif, pluralisation complexe limitée | 9 — `django.utils.translation` intégré, mature |
+| Hashage de mot de passe moderne | 9 — bcrypt/argon2 par défaut recommandé | 7 — nécessite config explicite d'Identity | 5 — rien nativement, à la charge de l'équipe | 9 — bcrypt/argon2 par défaut recommandé | 8 — PBKDF2 par défaut, argon2 en option |
+| Maturité | 9 — +10 ans de prod à grande échelle | 8 — +10 ans de prod à grande échelle | 5 — le plus récent, retours limités | 7 — mûr, historiquement moindre échelle | 9 — +10 ans de prod à grande échelle |
+| Typage statique | 10 — typé de bout en bout (Java) | 10 — typé de bout en bout (C#) | 8 — TypeScript, contournable à l'exécution | 3 — langage dynamique (PHP) | 3 — langage dynamique (Python) |
+| Modèle de concurrence (charge I/O-bound) | 7 — threads-bloquants par défaut | 9 — async/await natif | 9 — event loop Node.js natif | 5 — synchrone par défaut | 5 — synchrone par défaut |
+| ORM / accès aux données | 9 — Hibernate/Spring Data JPA, mûr mais verbeux | 9 — Entity Framework, mûr mais verbeux | 5 — pas d'ORM officiel (TypeORM/Prisma tiers) | 10 — Eloquent, le plus simple d'usage | 10 — ORM intégré, le plus simple d'usage |
 | **Total /70** | **62** | **60** | **45** | **46** | **48** |
 
 Point de vigilance documenté : le critère « modularité/DDD » ne distingue pas d'outillage DDD strict dans tous les frameworks — un développeur expérimenté peut structurer proprement n'importe lequel d'entre eux par seule discipline (c'est notamment le cas de Django, dont les « apps » permettent une bonne modularité si les conventions sont suivies). Le choix privilégie malgré tout les mécanismes imposés/outillés nativement par le framework plutôt que la discipline d'équipe seule, précisément parce que l'audit (§1.3) montre que l'absence d'un tel garde-fou est ce qui a produit la divergence de code dans l'existant.
@@ -187,11 +187,11 @@ Méthode : même protocole que pour le choix du backend — notation indépendan
 
 | Critère | PostgreSQL | MySQL/MariaDB | SQL Server | Oracle |
 |---|---|---|---|---|
-| ACID / intégrité transactionnelle | 9 | 7 | 9 | 10 |
-| Réplication régionale (réplicas en lecture) | 8 | 9 | 7 | 9 |
-| Écosystème Spring Boot (Hibernate/Spring Data JPA) | 10 | 9 | 7 | 6 |
-| Maturité / fiabilité générale | 9 | 9 | 9 | 10 |
-| Richesse des types natifs (JSON, géospatial, full-text) | 10 | 6 | 8 | 8 |
+| ACID / intégrité transactionnelle | 9 — garanties complètes | 7 — seulement sous InnoDB strict | 9 — garanties complètes | 10 — moteur le plus éprouvé en critique |
+| Réplication régionale (réplicas en lecture) | 8 — flexible mais quelques aspérités en logique | 9 — la plus simple et éprouvée à grande échelle | 7 — Always On, performant mais coûteux à opérer | 9 — Data Guard, complet mais lourd |
+| Écosystème Spring Boot (Hibernate/Spring Data JPA) | 10 — support natif le plus riche | 9 — très bien supporté | 7 — dialecte moins prioritaire, pilote JDBC propriétaire | 6 — idem, licence à part |
+| Maturité / fiabilité générale | 9 — décennies de prod à grande échelle | 9 — idem | 9 — idem | 10 — référence historique entreprise |
+| Richesse des types natifs (JSON, géospatial, full-text) | 10 — JSON binaire indexable, géospatial, full-text intégrés | 6 — JSON plus récent, pas de géospatial direct | 8 — couvert mais cloisonné/payant par module | 8 — idem |
 | **Total /50** | **46** | **40** | **40** | **43** |
 
 Points de vigilance documentés : le classement MySQL/MariaDB suppose InnoDB en mode strict (configuration moderne par défaut) — sous des réglages hérités plus permissifs, son score ACID serait plus bas. Le critère de réplication régionale est le plus débattu des cinq : MySQL reste historiquement la solution la plus simple et la plus éprouvée pour démultiplier des réplicas en lecture à grande échelle, Oracle Data Guard la plus complète mais la plus lourde à opérer, PostgreSQL la plus flexible mais avec quelques aspérités sur la réplication logique — un autre expert pourrait pondérer cet ordre différemment.
@@ -217,11 +217,11 @@ Méthode : même protocole double évaluation (interne + agent IA indépendant) 
 
 | Critère | Angular | React/Next.js | Vue/Nuxt | Svelte/SvelteKit |
 |---|---|---|---|---|
-| Accessibilité (WCAG/RGAA) | 9 / 8 | 8 / 9 | 7 / 6 | 8 / 7 |
-| i18n | 9 / 7 | 8 / 9 | 8 / 9 | 6 / 5 |
-| Structure imposée / maintenabilité | 9 / 10 | 5 / 6 | 7 / 7 | 7 / 6 |
-| Flexibilité de rendu SSR/SSG/CSR | 7 / 7 | 10 / 10 | 9 / 9 | 9 / 8 |
-| Maturité / écosystème | 9 / 8 | 10 / 10 | 8 / 8 | 6 / 5 |
+| Accessibilité (WCAG/RGAA) | 9 / 8 — CDK officiel, mais plus restreint | 8 / 9 — écosystème plus riche et éprouvé (React Aria, Radix), non officiel | 7 / 6 — correct, moins outillé | 8 / 7 — correct, moins outillé |
+| i18n | 9 / 7 — `@angular/localize` officiel, plus rigide | 8 / 9 — `next-intl` non officiel mais de facto standard | 8 / 9 — `vue-i18n` non officiel mais mature | 6 / 5 — outillage i18n moins mature |
+| Structure imposée / maintenabilité | 9 / 10 — la plus stricte (modules, DI, conventions CLI) | 5 / 6 — bibliothèque de rendu, pas de structure imposée | 7 / 7 — liberté d'organisation modérée | 7 / 6 — liberté d'organisation modérée |
+| Flexibilité de rendu SSR/SSG/CSR | 7 / 7 — Angular Universal, configuration plus lourde | 10 / 10 — support multi-mode le plus mature | 9 / 9 — comparable via Nuxt | 9 / 8 — comparable via SvelteKit |
+| Maturité / écosystème | 9 / 8 — mûr, porté par Google, composants tiers plus restreints | 10 / 10 — plus grand écosystème et bassin de recrutement | 8 / 8 — communauté solide mais plus petite | 6 / 5 — le plus récent en adoption à grande échelle |
 | **Total /50 (interne / agent indépendant)** | **43 / 40** | **41 / 44** | **39 / 39** | **36 / 31** |
 
 Contrairement au backend et à la base de données, les deux évaluations indépendantes ne convergent pas sur un vainqueur net : Angular l'emporte dans la notation interne, React/Next.js dans la notation indépendante. L'écart se concentre sur deux critères :
@@ -244,13 +244,13 @@ Critères : (1) adéquation avec un monolithe modulaire à déploiement unique �
 
 | Critère | A. VMs + IaC | B. Docker + Kubernetes | C. Conteneurs managés sans cluster | D. PaaS |
 |---|---|---|---|---|
-| Adéquation monolithe mono-déploiement | 6 / 7 | 4 / 2 | 9 / 9 | 8 / 9 |
-| Résolution de la faiblesse de l'audit | 6 / 6 | 9 / 8 | 9 / 9 | 8 / 8 |
-| Complexité opérationnelle (équipe restreinte) | 5 / 6 | 3 / 2 | 9 / 9 | 9 / 9 |
-| Portabilité / évitement du lock-in | 7 / 7 | 9 / 9 | 5 / 6 | 3 / 4 |
-| Capacité d'évolution future | 4 / 4 | 9 / 9 | 7 / 8 | 6 / 4 |
-| Maturité / écosystème | 8 / 9 | 9 / 9 | 7 / 8 | 8 / 8 |
-| Réplication multi-région du même artefact | 7 / 6 | 5 / 5 | 10 / 9 | 8 / 7 |
+| Adéquation monolithe mono-déploiement | 6 / 7 — adéquat mais sans auto du déploiement applicatif | 4 / 2 — surdimensionné pour un artefact unique répliqué | 9 / 9 — conçu pour ce besoin précis | 8 / 9 — conçu pour ce besoin précis |
+| Résolution de la faiblesse de l'audit | 6 / 6 — infra scriptée, déploiement appli pas forcément automatisé | 9 / 8 — déploiement et rollback natifs | 9 / 9 — idem | 8 / 8 — idem, par artefact |
+| Complexité opérationnelle (équipe restreinte) | 5 / 6 — manuel sur le runtime malgré l'IaC | 3 / 2 — charge la plus lourde (cluster, réseau, RBAC) | 9 / 9 — aucune gestion de cluster | 9 / 9 — aucune gestion de cluster |
+| Portabilité / évitement du lock-in | 7 / 7 — hyperviseur générique, portable | 9 / 9 — standard le plus portable par conception | 5 / 6 — API propriétaire par fournisseur | 3 / 4 — historiquement le plus verrouillé |
+| Capacité d'évolution future | 4 / 4 — peu adapté sans réécriture | 9 / 9 — le mieux outillé pour une décomposition future | 7 / 8 — possible (cas du tchat) mais moins fin | 6 / 4 — peu adapté sans réécriture |
+| Maturité / écosystème | 8 / 9 — très mûr (Ansible/Terraform) | 9 / 9 — très mûr, outillage et doc riches | 7 / 8 — mûr | 8 / 8 — mûr, extensions plus restreintes |
+| Réplication multi-région du même artefact | 7 / 6 — faisable, scripting manuel | 5 / 5 — possible, au prix d'un cluster par région | 10 / 9 — le mieux adapté au besoin réel | 8 / 7 — natif, bien adapté |
 | **Total /70 (interne / agent indépendant)** | **43 / 45** | **48 / 44** | **56 / 58** | **50 / 49** |
 
 Les deux évaluations convergent nettement sur l'option C, avec un écart qui se creuse à mesure que les critères sont ajoutés. Kubernetes (B) est explicitement écarté non pas pour un manque de maturité — il reste l'option la plus portable et la mieux outillée pour une évolution future vers des services indépendants — mais parce qu'il répond à un problème de scalabilité multi-services que ce projet n'a pas, au prix d'une charge opérationnelle (gestion de cluster, mises à jour, réseau, RBAC) que l'équipe n'a pas vocation à porter.
@@ -274,11 +274,11 @@ OVHcloud a été noté sur ses mérites techniques actuels comme les autres cand
 
 | Critère | AWS | Azure | GCP | OVHcloud |
 |---|---|---|---|---|
-| Couverture géographique | 10 / 10 | 10 / 9 | 8 / 8 | 7 / 5 |
-| Service PostgreSQL managé | 10 / 10 | 9 / 8 | 8 / 8 | 6 / 4 |
-| Conformité réglementaire / certifications | 9 / 9 | 9 / 9 | 8 / 8 | 9 / 8 |
-| Maturité plateformes conteneurs serverless | 9 / 9 | 6 / 6 | 9 / 9 | 4 / 2 |
-| Maturité / part de marché générale | 10 / 10 | 9 / 9 | 8 / 7 | 6 / 4 |
+| Couverture géographique | 10 / 10 — présence historique forte Europe + Amérique du Nord | 10 / 9 — idem | 8 / 8 — couvre les deux zones, moins de régions | 7 / 5 — présence nord-américaine récente et limitée |
+| Service PostgreSQL managé | 10 / 10 — RDS/Aurora, la référence la plus éprouvée | 9 / 8 — comparable, historique plus court sur PostgreSQL | 8 / 8 — idem | 6 / 4 — managé mais moins riche (pas de réplicas cross-région) |
+| Conformité réglementaire / certifications | 9 / 9 — certifications standard (ISO 27001, SOC 2, RGPD) | 9 / 9 — idem | 8 / 8 — idem | 9 / 8 — favorisé par l'absence d'exposition au CLOUD Act, pondération discutable |
+| Maturité plateformes conteneurs serverless | 9 / 9 — Fargate/ECS, offre la plus mature | 6 / 6 — Container Apps, GA depuis 2022 seulement | 9 / 9 — Cloud Run, offre mature | 4 / 2 — pas d'offre réellement équivalente |
+| Maturité / part de marché générale | 10 / 10 — leader de marché historique | 9 / 9 — concurrent mature et établi | 8 / 7 — mûr, part de marché plus restreinte | 6 / 4 — solide en Europe, sans commune mesure mondiale |
 | **Total /50 (interne / agent indépendant)** | **48 / 48** | **43 / 41** | **41 / 40** | **32 / 23** |
 
 Les deux évaluations convergent sur le même classement : AWS en tête, Azure second, GCP troisième, OVHcloud dernier — la correction du critère 4 a même renforcé l'avance d'AWS plutôt que de la réduire (Azure Container Apps n'est en disponibilité générale que depuis 2022, OVHcloud n'a pas d'offre dédiée réellement comparable dans cette catégorie précise). Point de vigilance documenté par l'agent indépendant sur le critère de conformité (ligne 3) : le score d'OVHcloud dépend fortement de la pondération choisie entre « nombre de certifications » (pénalisant, 5-6) et « souveraineté des données / absence d'exposition au CLOUD Act américain » (favorable, pourrait dépasser AWS/Azure) — cela ne change pas le classement global.
@@ -310,12 +310,12 @@ Méthode : même grille de notation de 1 à 10 que pour les autres choix, en une
 
 | Critère | A. Broker en mémoire seul | B. Relais RabbitMQ | C. Redis pub/sub | D. PostgreSQL LISTEN/NOTIFY |
 |---|---|---|---|---|
-| Fonctionnement multi-instances | 1 | 10 | 9 | 9 |
-| Cohérence avec la base (notification après enregistrement) | 3 | 5 | 5 | 10 |
-| Infrastructure / charge opérationnelle | 10 | 3 | 7 | 9 |
-| Montée en charge au volume attendu | 2 | 9 | 9 | 8 |
-| Multi-région sans dépendre du primaire | 2 | 7 | 6 | 4 |
-| Maturité / intégration Spring | 9 | 9 | 8 | 6 |
+| Fonctionnement multi-instances | 1 — ne connaît que les clients de la même instance | 10 — externe à l'instance par nature | 9 — idem | 9 — idem |
+| Cohérence avec la base (notification après enregistrement) | 3 — même incohérence potentielle, sans portée multi-instance | 5 — écriture à deux endroits, désync possible si panne entre les deux | 5 — idem | 10 — transactionnel, ne notifie que si la transaction est validée |
+| Infrastructure / charge opérationnelle | 10 — aucune infrastructure ajoutée | 3 — cluster complet à déployer/sécuriser/surveiller | 7 — service managé supplémentaire, simple à opérer | 9 — une connexion dédiée par instance, sur la base déjà présente |
+| Montée en charge au volume attendu | 2 — échoue déjà sur le multi-instances | 9 — conçu pour un débit très élevé | 9 — idem | 8 — largement suffisant, plafonne plus tôt (voir limite ci-dessous) |
+| Multi-région sans dépendre du primaire | 2 — pas de portée multi-région de toute façon | 7 — cluster fédéré multi-région indépendant de la base | 6 — réplication native de clusters Redis | 4 — le plus dépendant du primaire unique (connexion directe requise) |
+| Maturité / intégration Spring | 9 — intégration Spring de première classe | 9 — idem (`spring-rabbit`) | 8 — intégration Spring mûre | 6 — aucun starter officiel, écoute à implémenter manuellement |
 | **Total /60** | **27** | **43** | **44** | **46** |
 
 Lecture des notes :
