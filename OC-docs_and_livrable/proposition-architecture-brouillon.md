@@ -316,14 +316,12 @@ Candidats évalués : (A) GitHub Actions ; (B) GitLab CI ; (C) AWS CodePipeline 
 
 | Critère | A. GitHub Actions | B. GitLab CI | C. AWS CodePipeline | D. Jenkins |
 |---|---|---|---|---|
-| Intégration au dépôt de code (GitHub) | 10 | 4 | 7 | 6 |
-| Déploiement vers ECR / ECS Fargate | 8 | 8 | 10 | 7 |
-| Charge opérationnelle (service hébergé) | 9 | 8 | 9 | 3 |
-| Portabilité / évitement du lock-in | 6 | 7 | 3 | 9 |
-| Maturité / écosystème | 9 | 8 | 7 | 9 |
+| Intégration au dépôt de code (GitHub) | 10 — natif sur le dépôt GitHub déjà en place | 4 — suppose de migrer ou dupliquer le dépôt | 7 — connecteur GitHub disponible, pensé d'abord pour CodeCommit | 6 — plugin GitHub fonctionnel mais pas natif |
+| Déploiement vers ECR / ECS Fargate | 8 — actions communautaires matures, non officielles AWS | 8 — équivalent, intégration AWS via plugin | 10 — natif, conçu pour ECS | 7 — plugins disponibles mais à maintenir soi-même |
+| Charge opérationnelle (service hébergé) | 9 — entièrement managé, aucune infrastructure à opérer | 8 — managé en SaaS, légèrement moins intégré à l'hébergement choisi | 9 — managé, mise à l'échelle automatique | 3 — serveur à installer, sécuriser et maintenir soi-même, la charge manuelle reprochée à l'existant |
+| Portabilité / évitement du lock-in | 6 — spécifique à GitHub, mais format YAML courant | 7 — portable, mais suppose d'adopter la plateforme GitLab | 3 — fortement couplé à l'écosystème AWS, en plus de l'hébergement | 9 — le plus portable, indépendant de tout fournisseur |
+| Maturité / écosystème | 9 — écosystème très large d'actions communautaires | 8 — mature, écosystème un peu plus restreint | 7 — plus récent, adoption moindre | 9 — le plus ancien et éprouvé, au prix de plus de plugins à gérer |
 | **Total /50** | **42** | **35** | **36** | **34** |
-
-Lecture des notes : GitLab CI suppose de migrer ou de dupliquer le dépôt ; CodePipeline s'intègre le mieux à ECS mais lie aussi le pipeline à AWS, en plus de l'hébergement ; Jenkins est le plus portable mais réintroduit un serveur à opérer et à maintenir, soit le type de charge manuelle que l'audit reproche à l'existant.
 
 Critère organisationnel (priorité 2) : GitHub Actions est déjà en service sur le dépôt de la PoC tchat (étape 4), avec deux pipelines : tests à chaque modification (`ci.yml`) et test de chaos qui coupe des instances en cours de conversation (`chaos.yml`).
 
