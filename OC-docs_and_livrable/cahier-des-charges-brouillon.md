@@ -31,7 +31,7 @@ Un client réservant dans un cadre professionnel, avec des besoins potentiels de
 - La génération de facture conforme (mentions légales, numérotation, obligations fiscales par pays) a été étudiée et volontairement écartée du périmètre : une simple confirmation de paiement (reçu Stripe) est jugée suffisante, pour éviter de transformer l'application en un produit de facturation réglementé à part entière.
 - Besoin retenu : possibilité, pour un client entreprise, de renseigner un statut de TVA/exonération au moment du paiement, pris en charge nativement par le prestataire de paiement (Stripe Tax — *capacité exacte à vérifier dans la documentation Stripe avant rédaction finale*).
 
-### Besoins fonctionnels complémentaires identifiés (hors périmètre initial)
+### Besoins fonctionnels complémentaires identifiés (hors périmètre initial) (AN03)
 
 - Création de compte, connexion, réinitialisation de mot de passe.
 - Désignation d'un conducteur distinct du réservataire sur une réservation.
