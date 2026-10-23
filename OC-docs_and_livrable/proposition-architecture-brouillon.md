@@ -1,10 +1,10 @@
 # Proposition d'architecture — Your Car Your Way (brouillon de travail)
 
-> Document de travail, livrable 2. Rempli progressivement (AU01 → AU04, puis AR01 → AR04).
+> Document de travail, livrable 2. Rempli progressivement.
 
 ## 1. Audit de l'existant
 
-### 1.1 Cartographie de l'architecture existante (AU01)
+### 1.1 Cartographie de l'architecture existante
 
 **Par pays**
 
@@ -23,7 +23,7 @@
 - Chaque pays possède sa propre base de données, avec un schéma divergent — pas de partage de données automatisé entre systèmes.
 - Conséquence directe : 4 silos technologiques indépendants, sans garantie de cohérence fonctionnelle entre eux (fonctionnalités divergentes DE/ES/IT, modèle de données et règles de réservation propres au UK).
 
-### 1.2 Critères d'audit (AU02)
+### 1.2 Critères d'audit
 
 *Liste ouverte, à consolider une fois tous les critères passés en revue — un même constat peut servir plusieurs critères à la fois (ex. maintenabilité et fiabilité se recoupent sur ce système).*
 
@@ -39,7 +39,7 @@
 
 **Sécurité** : la capacité du système à protéger les données et les accès contre les menaces (accès non autorisé, interception, exploitation de vulnérabilités connues), au moyen de mécanismes de protection éprouvés et à jour.
 
-### 1.3 Audit détaillé (AU03)
+### 1.3 Audit détaillé
 
 **Maintenabilité**
 - Code source DE/ES/IT "souvent copié/adapté" depuis le socle FR, entraînant une divergence progressive et des règles métier parfois différentes d'un pays à l'autre — évolution non maîtrisée du code au fil du temps.
@@ -73,7 +73,7 @@
 - Gestion des secrets : secrets stockés en fichiers de configuration sur serveur (FR/DE/ES/IT), sans rotation ni contrôle d'accès dédié — contre des approches plus structurées mais encore incomplètes ailleurs (variables d'environnement sans rotation sur UK/CA, KeyVault partiel sur US).
 - Dépendances vulnérables : 35-41 % des paquets (FR/DE/ES/IT) contre 11-22 % (UK/CA/US) — la plus grande surface d'exposition à des vulnérabilités déjà documentées.
 
-### 1.4 Conclusion (AU04)
+### 1.4 Conclusion
 
 | Critère | Verdict | Justification courte |
 |---|---|---|
@@ -90,9 +90,9 @@
 
 ---
 
-## 2. Spécifications techniques et architecture cible (AR01 → AR04)
+## 2. Spécifications techniques et architecture cible
 
-### 2.1 Spécifications techniques (AR01)
+### 2.1 Spécifications techniques
 
 **Authentification et comptes**
 - Système de création de compte / connexion / récupération de mot de passe (absent de l'existant, cf. cahier des charges §1).
@@ -103,7 +103,7 @@
 - Recherche et réservation inter-pays (ville de départ ≠ pays de la ville de retour).
 - Devise déterminée par le pays de la ville de départ ; conversion déléguée au prestataire de paiement.
 - Interface multilingue (socle FR/EN/DE/ES/IT), conçue pour permettre l'ajout de langues sans refonte.
-- **Point ouvert (repris du cahier des charges, AN02)** : obligations linguistiques propres à certaines juridictions, en particulier au Québec (Charte de la langue française, renforcée par la loi 96 en 2022), à vérifier avant l'ouverture du marché CA. Le socle multilingue couvre déjà le français ; l'enjeu porte sur les obligations éventuelles (français par défaut, documents contractuels en français), pas sur l'architecture.
+- **Point ouvert (repris du cahier des charges, §2)** : obligations linguistiques propres à certaines juridictions, en particulier au Québec (Charte de la langue française, renforcée par la loi 96 en 2022), à vérifier avant l'ouverture du marché CA. Le socle multilingue couvre déjà le français ; l'enjeu porte sur les obligations éventuelles (français par défaut, documents contractuels en français), pas sur l'architecture.
 
 **Accessibilité**
 - Conformité aux standards d'accessibilité (WCAG/RGAA) sur l'ensemble du parcours : navigation clavier, compatibilité lecteur d'écran, structure sémantique.
@@ -117,9 +117,9 @@
 - Accès du personnel d'agence scopé par région/agence (moindre privilège).
 
 **Données et architecture globale**
-- Un socle de données logiquement unifié (remplace les 4 schémas divergents actuels) — condition nécessaire à la recherche/réservation inter-pays et à l'évolutivité (cf. audit AU04).
+- Un socle de données logiquement unifié (remplace les 4 schémas divergents actuels) — condition nécessaire à la recherche/réservation inter-pays et à l'évolutivité (cf. conclusion de l'audit, §1.4).
 - Les données (comptes, réservations, catalogue véhicules/offres) doivent rester accessibles globalement, quelle que soit la région de l'utilisateur ou du serveur qui traite la requête — la distribution géographique des serveurs ne doit pas fragmenter les données en silos régionaux (cf. résidence des données ci-dessous).
-- **Résidence des données (point ouvert du cahier des charges AN02, tranché ici).** La topologie retenue (un seul primaire PostgreSQL en Europe, un réplica en lecture en Amérique du Nord, §2.2) suppose qu'aucune obligation légale n'impose de stocker les données d'un pays dans ce pays. Vérification faite le 22/10/2026 :
+- **Résidence des données (point ouvert du cahier des charges, §2, tranché ici).** La topologie retenue (un seul primaire PostgreSQL en Europe, un réplica en lecture en Amérique du Nord, §2.2) suppose qu'aucune obligation légale n'impose de stocker les données d'un pays dans ce pays. Vérification faite le 22/10/2026 :
   - **Pas d'obligation de localisation identifiée** pour une entreprise privée de location dans les 7 pays. Le RGPD (UE) et le UK GDPR n'imposent pas de stockage en Europe : ils encadrent les *transferts* hors de leur territoire (chapitre V du RGPD, articles 44 à 49). Au Canada, la loi fédérale PIPEDA ne fixe pas d'obligation de localisation : elle repose sur la responsabilité de l'organisation, qui doit garantir par contrat un niveau de protection comparable lorsque les données sont traitées ailleurs [OPC]. Pas de règle fédérale de localisation aux États-Unis pour ce type de données.
   - **Choix de conception, au-delà du droit** : cloisonner les données par pays ou par région rendrait l'exploitation lourde (un schéma et des sauvegardes par pays, des migrations à synchroniser) et casserait l'usage normal du service : un client européen qui loue aux États-Unis, ou l'inverse, doit retrouver son compte et ses réservations. C'est précisément le défaut de l'existant (§1.3, silos par pays).
   - **Conditions à respecter** (le réplica nord-américain reçoit une copie des données des clients européens, ce qui constitue un transfert au sens du RGPD) :
@@ -147,11 +147,11 @@
 - Capacité à absorber une charge significativement supérieure à celle de n'importe quel système actuel pris isolément, sans nécessiter la somme brute des pics de chaque marché (les marchés ne sont pas supposés être simultanément au pic).
 - Architecture pensée dès le départ pour accueillir de nouveaux marchés/fonctionnalités sans refonte complète.
 
-### 2.2 Choix technologiques (AR02)
+### 2.2 Choix technologiques
 
 **Critères d'évaluation, par ordre de priorité**
 
-1. **Adéquation fonctionnelle et technique** (priorité la plus haute) : la solution répond-elle aux spécifications de l'AR01 et corrige-t-elle les faiblesses identifiées à l'audit (§1.3) — API-first/données unifiées, accessibilité, i18n, scalabilité horizontale, sécurité, CI/CD ?
+1. **Adéquation fonctionnelle et technique** (priorité la plus haute) : la solution répond-elle aux spécifications techniques (§2.1) et corrige-t-elle les faiblesses identifiées à l'audit (§1.3) — API-first/données unifiées, accessibilité, i18n, scalabilité horizontale, sécurité, CI/CD ?
 2. **Contraintes organisationnelles** (secondaires, départagent entre options par ailleurs proches) : compétences déjà présentes dans l'équipe, coût, réutilisation d'un fournisseur cloud déjà en place.
 
 **Justification de cet ordre** : l'audit montre que l'organisation est déjà capable d'adopter une stack entièrement nouvelle avec succès (US : Angular/Spring Boot/Azure, containerisé — seule application de l'existant à l'être). La familiarité de l'équipe avec une technologie n'est donc pas un facteur bloquant ; elle ne doit faire pencher la balance qu'entre deux options par ailleurs équivalentes sur le plan technique.
@@ -219,7 +219,7 @@ Justification : meilleur score sur les deux évaluations indépendantes, meilleu
 Candidats évalués : Angular, React (+ Next.js pour le SSR), Vue.js (+ Nuxt), Svelte (+ SvelteKit). Ember.js a été considéré puis écarté sans notation : philosophie structurante comparable à Angular, mais communauté et bassin de recrutement en déclin marqué ces dernières années. VanillaJS/jQuery a également été considéré puis écarté : aucune convention de structure, d'accessibilité ni d'i18n native, ce qui reproduirait précisément le risque de divergence identifié à l'audit (§1.3).
 
 Critères (mêmes principes que pour le backend : adéquation technique d'abord, compétences d'équipe en départage secondaire) :
-1. Accessibilité (WCAG/RGAA) — exigence transverse forte et légalement engageante (§2 AN02).
+1. Accessibilité (WCAG/RGAA) — exigence transverse forte et légalement engageante (cahier des charges, §2).
 2. Internationalisation (i18n).
 3. Structure imposée / maintenabilité — un framework qui impose une architecture limite le risque de divergence entre équipes pays, à l'image du raisonnement déjà tenu pour le backend (DDD/Spring Modulith).
 4. Flexibilité de rendu (SSR/SSG/CSR) — pages publiques (recherche, catalogue) vs parcours authentifié type application.
@@ -278,7 +278,7 @@ Candidats évalués : AWS, Microsoft Azure, Google Cloud Platform, OVHcloud. Sca
 Critères :
 1. Couverture géographique (Europe + Amérique du Nord) — nécessaire pour les réplicas régionaux déjà décidés pour PostgreSQL.
 2. Service PostgreSQL managé.
-3. Conformité réglementaire / certifications (RGPD, encadrement des transferts de données hors UE). *(Au moment de la notation, la résidence des données était encore un point ouvert ; elle a été tranchée depuis en §2.1 AR01 : pas d'obligation de localisation identifiée, transferts encadrés par les clauses contractuelles types du DPA AWS. Ce critère ne change donc pas le classement.)*
+3. Conformité réglementaire / certifications (RGPD, encadrement des transferts de données hors UE). *(Au moment de la notation, la résidence des données était encore un point ouvert ; elle a été tranchée depuis en §2.1 : pas d'obligation de localisation identifiée, transferts encadrés par les clauses contractuelles types du DPA AWS. Ce critère ne change donc pas le classement.)*
 4. Maturité des plateformes de conteneurs serverless (sans gestion de cluster) — corrige directement la faiblesse de déploiements manuels/fragiles identifiée à l'audit (§1.3). *(Critère reformulé après coup : la première version demandait la maturité Kubernetes managé, avant que le choix d'orchestration — ci-dessous — n'écarte explicitement Kubernetes au profit d'une plateforme de conteneurs serverless sans cluster. Les deux évaluations ont été refaites sur la bonne base.)*
 5. Maturité / part de marché générale.
 
@@ -364,9 +364,9 @@ Points de vigilance documentés :
 
 Validation par la PoC (étape 4, mesures locales Docker Compose du 19/10/2026) : sur 2 234 messages avec 4 arrêts brutaux d'instance, 0 message perdu, dupliqué ou désordonné ; latence entre instances p95 de 18,9 ms en régime établi ; 204,3 ms en simulant une instance nord-américaine (+80 ms ajoutés sur ses connexions à la base) — à confirmer sur un vrai réseau transatlantique.
 
-### 2.3 Modélisation UML (AR03)
+### 2.3 Modélisation UML
 
-Conformément à la recommandation de la mission (« Utilisez des diagrammes UML adaptés (composants, déploiement, classes) »), trois diagrammes ont été produits, chacun reprenant directement les décisions actées en §2.2 (AR02).
+Conformément à la recommandation de la mission (« Utilisez des diagrammes UML adaptés (composants, déploiement, classes) »), trois diagrammes ont été produits, chacun reprenant directement les décisions actées en §2.2.
 
 **Diagramme de composants**
 
@@ -384,11 +384,11 @@ Illustre la topologie AWS cible : le même artefact applicatif (monolithe) dépl
 
 ![Diagramme de classes](Diagrammes/diagramme-classes.png)
 
-Modélise le domaine métier central (Compte, Réservation, Conducteur, Offre, Véhicule, Agence, Extra, Paiement, PersonnelAgence) et les règles métier actées au cahier des charges (mécanisme invité/activé, conducteur distinct du réservataire, réservation inter-pays via deux rôles d'agence départ/retour, délais de modification/annulation, remboursement partiel). Sert de base au modèle de données relationnel détaillé en §2.4 (AR04). Un paquetage séparé représente le domaine du Service Tchat (Conversation, Message), sans association vers le domaine du monolithe : le tchat ne connaît le client et la réservation que par leurs identifiants.
+Modélise le domaine métier central (Compte, Réservation, Conducteur, Offre, Véhicule, Agence, Extra, Paiement, PersonnelAgence) et les règles métier actées au cahier des charges (mécanisme invité/activé, conducteur distinct du réservataire, réservation inter-pays via deux rôles d'agence départ/retour, délais de modification/annulation, remboursement partiel). Sert de base au modèle de données relationnel détaillé en §2.4. Un paquetage séparé représente le domaine du Service Tchat (Conversation, Message), sans association vers le domaine du monolithe : le tchat ne connaît le client et la réservation que par leurs identifiants.
 
-### 2.4 Modèle de données (AR04)
+### 2.4 Modèle de données
 
-Traduction directe du diagramme de classes (§2.3) en schéma relationnel PostgreSQL. Convention : identifiants techniques en `BIGSERIAL` (non représentés sur le diagramme conceptuel, nécessaires au niveau physique), noms de tables/colonnes en `snake_case`, un seul schéma partagé par l'ensemble des marchés — conformément à l'exigence d'un socle de données unifié (§2.1 AR01, §1.4 AU04). La réplication régionale en lecture (primaire Europe / réplica Amérique du Nord) a déjà été actée en §2.2 (AR02) et n'est pas reprise ici — ce schéma est celui appliqué sur l'instance primaire, répliqué tel quel.
+Traduction directe du diagramme de classes (§2.3) en schéma relationnel PostgreSQL. Convention : identifiants techniques en `BIGSERIAL` (non représentés sur le diagramme conceptuel, nécessaires au niveau physique), noms de tables/colonnes en `snake_case`, un seul schéma partagé par l'ensemble des marchés — conformément à l'exigence d'un socle de données unifié (§2.1, §1.4). La réplication régionale en lecture (primaire Europe / réplica Amérique du Nord) a déjà été actée en §2.2 et n'est pas reprise ici — ce schéma est celui appliqué sur l'instance primaire, répliqué tel quel.
 
 **Comptes et personnel**
 
@@ -424,7 +424,7 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 
 | Table | Colonnes | Clés / contraintes |
 |---|---|---|
-| `paiement` | `id`, `montant`, `devise`, `statut_tva` (nul), `reference_externe`, `statut` (`statut_paiement`) | PK `id` ; `reference_externe` UNIQUE NOT NULL (identifiant côté Stripe) ; aucune donnée de carte stockée (délégation intégrale, §2.1 AR01) |
+| `paiement` | `id`, `montant`, `devise`, `statut_tva` (nul), `reference_externe`, `statut` (`statut_paiement`) | PK `id` ; `reference_externe` UNIQUE NOT NULL (identifiant côté Stripe) ; aucune donnée de carte stockée (délégation intégrale, §2.1) |
 
 **Énumérations (types PostgreSQL natifs)**
 
@@ -438,7 +438,7 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 - `offre(agence_depart_id, agence_retour_id, date_debut_disponibilite, date_fin_disponibilite)` — recherche d'offre par ville/période (US "Rechercher une offre").
 - Index GiST de la contrainte d'exclusion `reservation(vehicule_id, période)` — créé par la contrainte elle-même ; sert aussi à vérifier rapidement si un véhicule est libre sur une période.
 - `vehicule(categorie_acriss, accessible)` — filtre véhicule adapté/catégorie ACRISS.
-- `personnel_agence(agence_id)` — application du scope d'accès par agence/région (moindre privilège, §2.1 AR01).
+- `personnel_agence(agence_id)` — application du scope d'accès par agence/région (moindre privilège, §2.1).
 
 **Service Tchat (base `chat`, propre au service)**
 

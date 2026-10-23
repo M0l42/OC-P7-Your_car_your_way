@@ -1,8 +1,8 @@
 # Cahier des charges — Your Car Your Way (brouillon de travail)
 
-> Document de travail, rempli progressivement au fil des décisions (AN01 → AN04). Ne pas considérer comme final tant que chaque section n'est pas explicitement validée.
+> Document de travail, rempli progressivement au fil des décisions. Ne pas considérer comme final tant que chaque section n'est pas explicitement validée.
 
-## 1. Analyse des besoins utilisateurs (AN01)
+## 1. Analyse des besoins utilisateurs
 
 ### Profils identifiés et besoins associés
 
@@ -31,7 +31,7 @@ Un client réservant dans un cadre professionnel, avec des besoins potentiels de
 - La génération de facture conforme (mentions légales, numérotation, obligations fiscales par pays) a été étudiée et volontairement écartée du périmètre : une simple confirmation de paiement (reçu Stripe) est jugée suffisante, pour éviter de transformer l'application en un produit de facturation réglementé à part entière.
 - Besoin retenu : possibilité, pour un client entreprise, de renseigner un statut de TVA/exonération au moment du paiement, pris en charge nativement par le prestataire de paiement (Stripe Tax — *capacité exacte à vérifier dans la documentation Stripe avant rédaction finale*).
 
-### Besoins fonctionnels complémentaires identifiés (hors périmètre initial) (AN03)
+### Besoins fonctionnels complémentaires identifiés (hors périmètre initial)
 
 - Création de compte, connexion, réinitialisation de mot de passe.
 - Désignation d'un conducteur distinct du réservataire sur une réservation.
@@ -40,7 +40,7 @@ Un client réservant dans un cadre professionnel, avec des besoins potentiels de
 - Statut de TVA/exonération fiscale pour les profils professionnels, délégué au prestataire de paiement.
 - Contact du service client par tchat en direct, accessible aux clients connectés comme aux invités (référence de réservation + email), et utilisable au clavier et au lecteur d'écran (cf. §2 Accessibilité).
 
-## 2. Considérations transverses (AN02)
+## 2. Considérations transverses
 
 ### Accessibilité
 
@@ -52,7 +52,7 @@ L'ensemble de l'interface (formulaires, résultats de recherche, parcours de pai
 - La suppression d'un compte entraîne la suppression des données personnelles, à l'exception des données dont la conservation est légalement obligatoire (historique de facturation), conservées pour la durée imposée par la réglementation applicable (*durée exacte à vérifier par pays*).
 - L'accès du personnel d'agence aux données clients est limité à leur périmètre géographique/agence (principe du moindre privilège) ; aucun accès global par défaut.
 - Aucune donnée de paiement n'est stockée par l'application : la gestion du paiement est intégralement déléguée à un prestataire externe (Stripe), réduisant d'autant le périmètre de conformité (PCI-DSS notamment).
-- **Point ouvert, à trancher avant l'architecture (étape 3) :** obligation légale ou non de résidence régionale des données selon les pays d'exploitation — à vérifier, ne pas supposer. *Tranché à l'étape 3 (proposition d'architecture, §2.1 AR01, « Résidence des données ») : pas d'obligation de localisation identifiée dans les 7 pays ; les transferts hors UE sont encadrés (clauses contractuelles types, adéquation canadienne) et une évaluation est requise pour les données des clients québécois (loi 25). Vérification sur sources secondaires, à faire valider par un juriste.*
+- **Point ouvert, à trancher avant l'architecture (étape 3) :** obligation légale ou non de résidence régionale des données selon les pays d'exploitation — à vérifier, ne pas supposer. *Tranché à l'étape 3 (proposition d'architecture, §2.1, « Résidence des données ») : pas d'obligation de localisation identifiée dans les 7 pays ; les transferts hors UE sont encadrés (clauses contractuelles types, adéquation canadienne) et une évaluation est requise pour les données des clients québécois (loi 25). Vérification sur sources secondaires, à faire valider par un juriste.*
 
 ### Internationalisation
 
@@ -60,7 +60,7 @@ L'ensemble de l'interface (formulaires, résultats de recherche, parcours de pai
 - La devise d'une location est déterminée par le pays de la ville de départ (lieu de prise en charge du véhicule et du contrat) ; toute conversion vers la devise de paiement du client est prise en charge nativement par le prestataire de paiement.
 - La langue de l'interface est un choix libre de l'utilisateur, indépendant du pays de location. Socle de langues au lancement : français, anglais, allemand, espagnol, italien — architecture conçue pour permettre l'ajout d'autres langues ultérieurement. **Point ouvert :** obligations linguistiques spécifiques à certaines juridictions (ex. Québec, Charte de la langue française) à vérifier.
 
-## 3. Spécifications fonctionnelles — user stories (AN04)
+## 3. Spécifications fonctionnelles — user stories
 
 ### Décidées, avec critères d'acceptation
 
