@@ -1,6 +1,6 @@
-# Proposition d'architecture — Your Car Your Way (brouillon de travail)
+# Proposition d'architecture — Your Car Your Way
 
-> Document de travail, livrable 2. Rempli progressivement.
+> Livrable 2.
 
 ## 1. Audit de l'existant
 
@@ -25,7 +25,7 @@
 
 ### 1.2 Critères d'audit
 
-*Liste ouverte, à consolider une fois tous les critères passés en revue — un même constat peut servir plusieurs critères à la fois (ex. maintenabilité et fiabilité se recoupent sur ce système).*
+*Un même constat peut servir plusieurs critères à la fois (ex. maintenabilité et fiabilité se recoupent sur ce système).*
 
 **Maintenabilité** : la capacité du système à être compris, corrigé et fait évoluer dans le temps, sans introduire de régressions ni de divergences entre les différentes versions/déploiements.
 
@@ -54,7 +54,7 @@
 **Disponibilité**
 - Taux de disponibilité moyen (12 mois) : 97,2 % (FR/DE/ES/IT) contre 98,6-98,9 % (UK/CA/US) — écart cohérent avec des déploiements manuels/une maintenance plus lourde sur OVH (cf. Maintenabilité).
 - Redondance : aucune réplication des instances applicatives (FR/DE/ES/IT) contre réplication partielle (UK/CA) et application containerisée mais base non redondante (US) — absence de redondance = exposition plus forte en cas de panne matérielle.
-- ⚠️ **Incohérence des chiffres à vérifier avec le mentor** : le taux de 97,2 % implique environ 20h d'indisponibilité mensuelle, très supérieur aux 21-28 minutes/mois indiquées plus bas (Fiabilité). Hypothèse retenue pour ce brouillon : le taux de disponibilité inclut les interruptions planifiées (maintenance, déploiements), alors que le chiffre en minutes ne couvre que les incidents non planifiés. À confirmer, et l'hypothèse elle-même reste fragile : elle impliquerait environ 20h de maintenance planifiée par mois (2,8 % de ~730h, moins ~25 min d'incidents), ce qui est très élevé même pour des déploiements manuels. Le point reste donc ouvert, et l'une des deux données de l'énoncé est peut-être erronée.
+- ⚠️ **Incohérence entre deux chiffres de l'énoncé** : le taux de 97,2 % implique environ 20h d'indisponibilité mensuelle, très supérieur aux 21-28 minutes/mois indiquées plus bas (Fiabilité). Hypothèse retenue : le taux de disponibilité inclut les interruptions planifiées (maintenance, déploiements), alors que le chiffre en minutes ne couvre que les incidents non planifiés. L'hypothèse reste toutefois fragile : elle impliquerait environ 20h de maintenance planifiée par mois (2,8 % de ~730h, moins ~25 min d'incidents), ce qui est très élevé même pour des déploiements manuels. Le point reste donc ouvert, et l'une des deux données de l'énoncé est peut-être erronée.
 
 **Fiabilité**
 - Temps moyen d'indisponibilité mensuel (incidents non planifiés, cf. hypothèse ci-dessus) : 21 à 28 min (FR/DE/ES/IT) contre 7 à 16 min (UK/CA/US).
@@ -65,11 +65,11 @@
 - L'architecture est monolithique, ce qui n'est pas en soi un problème si le monolithe est bien structuré. Mais rien dans l'existant ne l'indique : le code copié/adapté entre pays, l'absence d'API interne et les schémas de données divergents suggèrent au contraire un manque de modularité — c'est ce manque de structuration, et non le choix du monolithe en lui-même, qui limite l'évolutivité actuelle.
 - Aucune base de données ou API commune entre pays : chaque marché est un silo isolé, sans fondation partagée sur laquelle étendre le système.
 - Tentatives d'évolution passées non généralisées : le Canada (React/Node, "première tentative d'unification visuelle, restée locale") et les États-Unis (seule application containerisée, "projet plus ambitieux, jamais généralisé") montrent que même les efforts de modernisation n'ont jamais dépassé le cadre d'un seul pays.
-- Scalabilité d'infrastructure : seule l'application US est containerisée — les 4 autres nécessiteraient une refonte d'infrastructure, pas seulement une configuration, pour absorber une charge croissante.
+- Scalabilité d'infrastructure : seule l'application US est containerisée — les 3 autres nécessiteraient une refonte d'infrastructure, pas seulement une configuration, pour absorber une charge croissante.
 
 **Sécurité**
-- Hashage des mots de passe : SHA-1 (FR/DE/ES/IT) — algorithme déprécié pour cet usage depuis plus d'une décennie, cassable avec du matériel courant — contre bcrypt/argon2id (UK/CA/US), standards actuels recommandés. *(à vérifier)*
-- Chiffrement du trafic : TLS 1.0 toujours utilisé (FR, IT) — protocole officiellement déprécié (RFC 8996, 2021), vulnérable à des attaques connues (BEAST, POODLE), abandonné par les navigateurs majeurs depuis 2020. *(à vérifier)*
+- Hashage des mots de passe : SHA-1 (FR/DE/ES/IT) — algorithme déprécié pour cet usage depuis plus d'une décennie, cassable avec du matériel courant — contre bcrypt/argon2id (UK/CA/US), standards actuels recommandés. *(Constat issu de la description technique fournie, non vérifié sur le code.)*
+- Chiffrement du trafic : TLS 1.0 toujours utilisé (FR, IT) — protocole officiellement déprécié (RFC 8996, 2021), vulnérable à des attaques connues (BEAST, POODLE), abandonné par les navigateurs majeurs depuis 2020. *(Constat issu de la description technique fournie, non vérifié sur le code.)*
 - Gestion des secrets : secrets stockés en fichiers de configuration sur serveur (FR/DE/ES/IT), sans rotation ni contrôle d'accès dédié — contre des approches plus structurées mais encore incomplètes ailleurs (variables d'environnement sans rotation sur UK/CA, KeyVault partiel sur US).
 - Dépendances vulnérables : 35-41 % des paquets (FR/DE/ES/IT) contre 11-22 % (UK/CA/US) — la plus grande surface d'exposition à des vulnérabilités déjà documentées.
 
@@ -84,7 +84,7 @@
 | Évolutivité | **Non validé, sur aucun des 4 systèmes** | Même les tentatives de modernisation (CA, US) ne sont jamais sorties du périmètre d'un seul pays ; absence totale de socle de données ou d'API partagé entre marchés. |
 | Sécurité | **Non validé (historique) / partiellement validé (récent)** | FR/DE/ES/IT cumulent les pratiques dépréciées (SHA-1, TLS 1.0, secrets non gérés, 35-41 % de dépendances vulnérables) ; UK/CA/US suivent de meilleures pratiques mais gardent des lacunes (pas de rotation des secrets, KeyVault partiel). |
 
-*Note sur le verdict Sécurité* : deux des constats qui le fondent (hashage SHA-1, TLS 1.0) sont marqués « à vérifier » en §1.3. Le verdict « Non validé » du socle historique tient même s'ils étaient infirmés, car il repose aussi sur des constats non contestés (secrets en fichiers de configuration sans rotation, 35-41 % de dépendances vulnérables) ; il serait en revanche à nuancer dans sa justification.
+*Note sur le verdict Sécurité* : deux des constats qui le fondent (hashage SHA-1, TLS 1.0) reposent sur la seule description technique, sans vérification sur le code (§1.3). Le verdict « Non validé » du socle historique tient même s'ils étaient infirmés, car il repose aussi sur des constats non contestés (secrets en fichiers de configuration sans rotation, 35-41 % de dépendances vulnérables) ; il serait en revanche à nuancer dans sa justification.
 
 **Synthèse** : aucun des quatre systèmes existants ne satisfait pleinement les critères retenus. Le socle historique (FR/DE/ES/IT) échoue sur la quasi-totalité d'entre eux. Les systèmes plus récents (UK, CA, US) se comportent nettement mieux sur les critères opérationnels (performance, disponibilité, fiabilité, sécurité), mais échouent eux aussi sur le critère le plus déterminant pour cette mission — l'évolutivité : aucun n'a jamais réussi à s'étendre au-delà d'un seul pays, faute de socle de données ou d'API partagé. Cela confirme qu'il ne s'agit pas de corriger ou d'étendre l'un des systèmes actuels, mais de concevoir une architecture cible commune, pensée dès le départ pour l'ensemble des marchés.
 
@@ -126,15 +126,15 @@
     1. *Vers les États-Unis* : clauses contractuelles types de la Commission européenne, intégrées à l'avenant RGPD d'AWS (Data Processing Addendum) [AWS-SCC]. AWS déclare aussi participer au EU-US Data Privacy Framework et à son extension britannique [AWS-DPF, ICO], mais ce cadre n'est pas retenu comme fondement unique : confirmé par le Tribunal de l'UE en septembre 2025, il fait l'objet d'un pourvoi devant la CJUE (C-703/25 P), et le CEPD a demandé en juillet 2026 son réexamen à la suite de la décision de la Cour suprême américaine Trump v. Slaughter [DPF-1, DPF-2].
     2. *Vers le Canada* (si le réplica est placé dans une région AWS canadienne) : décision d'adéquation de la Commission européenne, confirmée lors de sa revue de janvier 2024 [CA-ADQ].
     3. *Québec (loi 25, article 17)* : une évaluation des facteurs relatifs à la vie privée est obligatoire avant de communiquer hors du Québec des renseignements personnels qui y ont été recueillis, y compris lorsqu'ils sont confiés à un prestataire. C'est le cas ici (primaire en Europe). La Commission d'accès à l'information publie un guide et un modèle pour cette évaluation [QC-25].
-  - **Plan de repli** si un pays impose un jour une localisation : un primaire régional pour ce pays (le schéma est commun, seule la topologie change), et, pour le tchat, la bascule vers Redis pub/sub déjà documentée comme critère de réouverture (§2.2, diffusion temps réel).
-  - *Sources consultées le 22/10/2026, essentiellement secondaires (cabinets d'avocats, éditeurs, pages des fournisseurs) : à faire valider par un juriste avant mise en production.* [OPC] [Commissariat à la protection de la vie privée du Canada, lignes directrices sur le traitement transfrontalier](https://www.priv.gc.ca/en/privacy-topics/personal-information-transferred-across-borders/gl_dab_090127/) ; [Torys, 2019](https://www.torys.com/en/our-latest-thinking/publications/2019/09/opc-not-changing-guidelines-on-transfers-for-processing). [AWS-SCC] [AWS Security Blog, clauses contractuelles types dans le DPA AWS](https://aws.amazon.com/blogs/security/new-standard-contractual-clauses-now-part-of-the-aws-gdpr-data-processing-addendum-for-customers). [AWS-DPF] [Amazon, participation au DPF](https://digprjsurvey.amazon.com/csad/help/node/G202135380) (statut actif à vérifier sur dataprivacyframework.gov). [ICO] [ICO, UK Extension du DPF](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/international-transfers/adequacy-regulations/how-does-the-uk-extension-to-the-eu-us-data-privacy-framework-work). [DPF-1] [Skadden, 07/2026](https://www.skadden.com/insights/publications/2026/07/supreme-court-decision-raises-new-questions) ; [DPF-2] [Hunton, avis du CEPD](https://www.hunton.com/privacy-and-cybersecurity-law-blog/edpb-calls-for-review-of-eu-u-s-data-privacy-framework-after-u-s-supreme-court-decision-on-ftc-independence). [CA-ADQ] [WeirFoulds, revue de l'adéquation canadienne](https://www.weirfoulds.com/canadas-privacy-protections-stand-strong) ; [McMillan](https://mcmillan.ca/insights/publications/privacy-on-ice-canada-maintains-gdpr-adequacy-status-despite-frozen-privacy-reforms/). [QC-25] [McCarthy Tétrault, guide de la CAI sur les évaluations de la loi 25](https://www.mccarthy.ca/en/insights/blogs/techlex/quebec-privacy-regulators-guide-law-25-compliant-privacy-impact-assessments) ; [IAPP](https://iapp.org/news/a/iapp-cps-23-forthcoming-quebec-privacy-regulations-situate-province-between-canada-and-europe).
+  - **Plan de repli** si un pays impose un jour une localisation : un primaire régional pour ce pays (le schéma est commun, seule la topologie change), et, pour le tchat, l'option d'un tchat par région d'origine du client (§2.2, diffusion temps réel). Redis pub/sub ne suffirait pas : il change la diffusion des messages, pas leur lieu de stockage.
+  - *Sources consultées le 22/10/2026, essentiellement secondaires (cabinets d'avocats, éditeurs, pages des fournisseurs) : à faire valider par un juriste avant mise en production.* [OPC] [Commissariat à la protection de la vie privée du Canada, lignes directrices sur le traitement transfrontalier](https://www.priv.gc.ca/en/privacy-topics/personal-information-transferred-across-borders/gl_dab_090127/) ; [Torys, 2019](https://www.torys.com/en/our-latest-thinking/publications/2019/09/opc-not-changing-guidelines-on-transfers-for-processing). [AWS-SCC] [AWS Security Blog, clauses contractuelles types dans le DPA AWS](https://aws.amazon.com/blogs/security/new-standard-contractual-clauses-now-part-of-the-aws-gdpr-data-processing-addendum-for-customers). [AWS-DPF] [Amazon, participation au DPF](https://digprjsurvey.amazon.com/csad/help/node/G202135380) (statut actif à confirmer sur dataprivacyframework.gov avant mise en production). [ICO] [ICO, UK Extension du DPF](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/international-transfers/adequacy-regulations/how-does-the-uk-extension-to-the-eu-us-data-privacy-framework-work). [DPF-1] [Skadden, 07/2026](https://www.skadden.com/insights/publications/2026/07/supreme-court-decision-raises-new-questions) ; [DPF-2] [Hunton, avis du CEPD](https://www.hunton.com/privacy-and-cybersecurity-law-blog/edpb-calls-for-review-of-eu-u-s-data-privacy-framework-after-u-s-supreme-court-decision-on-ftc-independence). [CA-ADQ] [WeirFoulds, revue de l'adéquation canadienne](https://www.weirfoulds.com/canadas-privacy-protections-stand-strong) ; [McMillan](https://mcmillan.ca/insights/publications/privacy-on-ice-canada-maintains-gdpr-adequacy-status-despite-frozen-privacy-reforms/). [QC-25] [McCarthy Tétrault, guide de la CAI sur les évaluations de la loi 25](https://www.mccarthy.ca/en/insights/blogs/techlex/quebec-privacy-regulators-guide-law-25-compliant-privacy-impact-assessments) ; [IAPP](https://iapp.org/news/a/iapp-cps-23-forthcoming-quebec-privacy-regulations-situate-province-between-canada-and-europe).
 
 **API**
 - API exposant les données (utilisateurs, réservations, véhicules...) avec opérations CRUD par domaine, pour les applications utilisées en agence (déjà requis au cahier des charges).
 
 **Paiement et fiscalité**
 - Paiement intégralement délégué à un prestataire externe (Stripe) — aucune donnée de paiement stockée.
-- Statut de TVA/exonération pour les profils entreprise, pris en charge nativement par le prestataire (Stripe Tax — à vérifier).
+- Statut de TVA/exonération pour les profils entreprise, pris en charge nativement par le prestataire (Stripe Tax : numéro de TVA du client et statut exonéré ou autoliquidation portés par le client Stripe).
 - Aucun moteur de facturation interne — reçu de paiement standard pour tous les profils.
 
 **Fiabilité et disponibilité** *(informé par l'audit, §1.3)*
@@ -174,7 +174,7 @@ Méthode : notation de 1 (mauvais) à 10 (excellent) par critère, sur l'adéqua
 
 | Critère | Spring Boot | .NET | NestJS | Laravel | Django |
 |---|---|---|---|---|---|
-| Modularité / DDD | 9 — Spring Modulith, frontières vérifiées à la compilation | 8 — assemblies + analyseurs Roslyn | 8 — modules imposés, frontières non vérifiées | 4 — aucune frontière imposée, dépend de la discipline | 4 — "apps" permettent une bonne modularité si suivies, non imposée |
+| Modularité / DDD | 9 — Spring Modulith, frontières vérifiées par un test exécuté en CI (`ApplicationModules.verify()`) | 8 — assemblies + analyseurs Roslyn | 8 — modules imposés, frontières non vérifiées | 4 — aucune frontière imposée, dépend de la discipline | 4 — "apps" permettent une bonne modularité si suivies, non imposée |
 | Support i18n | 9 — `MessageSource` intégré, mature | 9 — `System.Globalization` intégré, mature | 5 — pas de module officiel, packages tiers variables | 8 — natif, pluralisation complexe limitée | 9 — `django.utils.translation` intégré, mature |
 | Hashage de mot de passe moderne | 9 — bcrypt/argon2 par défaut recommandé | 7 — nécessite config explicite d'Identity | 5 — rien nativement, à la charge de l'équipe | 9 — bcrypt/argon2 par défaut recommandé | 8 — PBKDF2 par défaut, argon2 en option |
 | Maturité | 9 — +10 ans de prod à grande échelle | 8 — +10 ans de prod à grande échelle | 5 — le plus récent, retours limités | 7 — mûr, historiquement moindre échelle | 9 — +10 ans de prod à grande échelle |
@@ -187,7 +187,7 @@ Point de vigilance documenté : le critère « modularité/DDD » ne distingue p
 
 **Décision : Java + Spring Boot.**
 
-Justification : meilleur score sur les deux évaluations indépendantes, cohérent avec la priorité 1 (adéquation technique). Sur le critère secondaire (priorité 2, compétences déjà présentes) : l'équipe US a déjà shippé en production sur Spring Boot/Angular/Azure containerisé — seule application de l'existant containerisée — ce qui confirme à la fois une compétence déjà disponible sur ce choix et la capacité de l'organisation à adopter une nouvelle stack avec succès.
+Justification : meilleur score sur les deux évaluations indépendantes, cohérent avec la priorité 1 (adéquation technique). Sur le critère secondaire (priorité 2, compétences déjà présentes) : l'équipe US a déjà mis en production sur Spring Boot/Angular/Azure containerisé — seule application de l'existant containerisée — ce qui confirme à la fois une compétence déjà disponible sur ce choix et la capacité de l'organisation à adopter une nouvelle stack avec succès.
 
 **Choix de la base de données**
 
@@ -201,9 +201,9 @@ Méthode : même protocole que pour le choix du backend — notation indépendan
 |---|---|---|---|---|
 | ACID / intégrité transactionnelle | 9 — garanties complètes | 7 — seulement sous InnoDB strict | 9 — garanties complètes | 10 — moteur le plus éprouvé en critique |
 | Réplication régionale (réplicas en lecture) | 8 — flexible mais quelques aspérités en logique | 9 — la plus simple et éprouvée à grande échelle | 7 — Always On, performant mais coûteux à opérer | 9 — Data Guard, complet mais lourd |
-| Écosystème Spring Boot (Hibernate/Spring Data JPA) | 10 — support natif le plus riche | 9 — très bien supporté | 7 — dialecte moins prioritaire, pilote JDBC propriétaire | 6 — idem, licence à part |
+| Écosystème Spring Boot (Hibernate/Spring Data JPA) | 10 — support natif le plus riche | 9 — très bien supporté | 7 — dialecte moins prioritaire, pilote JDBC maintenu par Microsoft | 6 — idem, licence à part |
 | Maturité / fiabilité générale | 9 — décennies de prod à grande échelle | 9 — idem | 9 — idem | 10 — référence historique entreprise |
-| Richesse des types natifs (JSON, géospatial, full-text) | 10 — JSON binaire indexable, géospatial, full-text intégrés | 6 — JSON plus récent, pas de géospatial direct | 8 — couvert mais cloisonné/payant par module | 8 — idem |
+| Richesse des types natifs (JSON, géospatial, full-text) | 10 — JSON binaire indexable, géospatial, full-text intégrés | 6 — JSON plus récent, géospatial plus limité | 8 — couvert mais cloisonné/payant par module | 8 — idem |
 | **Total /50** | **46** | **40** | **40** | **43** |
 
 Points de vigilance documentés : le classement MySQL/MariaDB suppose InnoDB en mode strict (configuration moderne par défaut) — sous des réglages hérités plus permissifs, son score ACID serait plus bas. Le critère de réplication régionale est le plus débattu des cinq : MySQL reste historiquement la solution la plus simple et la plus éprouvée pour démultiplier des réplicas en lecture à grande échelle, Oracle Data Guard la plus complète mais la plus lourde à opérer, PostgreSQL la plus flexible mais avec quelques aspérités sur la réplication logique — un autre expert pourrait pondérer cet ordre différemment.
@@ -232,13 +232,13 @@ Méthode : même protocole double évaluation (interne + agent IA indépendant) 
 | Accessibilité (WCAG/RGAA) | 9 / 8 — CDK officiel, mais plus restreint | 8 / 9 — écosystème plus riche et éprouvé (React Aria, Radix), non officiel | 7 / 6 — correct, moins outillé | 8 / 7 — correct, moins outillé |
 | i18n | 9 / 7 — `@angular/localize` officiel, plus rigide | 8 / 9 — `next-intl` non officiel mais de facto standard | 8 / 9 — `vue-i18n` non officiel mais mature | 6 / 5 — outillage i18n moins mature |
 | Structure imposée / maintenabilité | 9 / 10 — la plus stricte (modules, DI, conventions CLI) | 5 / 6 — bibliothèque de rendu, pas de structure imposée | 7 / 7 — liberté d'organisation modérée | 7 / 6 — liberté d'organisation modérée |
-| Flexibilité de rendu SSR/SSG/CSR | 7 / 7 — Angular Universal, configuration plus lourde | 10 / 10 — support multi-mode le plus mature | 9 / 9 — comparable via Nuxt | 9 / 8 — comparable via SvelteKit |
+| Flexibilité de rendu SSR/SSG/CSR | 7 / 7 — `@angular/ssr`, configuration plus lourde | 10 / 10 — support multi-mode le plus mature | 9 / 9 — comparable via Nuxt | 9 / 8 — comparable via SvelteKit |
 | Maturité / écosystème | 9 / 8 — mûr, porté par Google, composants tiers plus restreints | 10 / 10 — plus grand écosystème et bassin de recrutement | 8 / 8 — communauté solide mais plus petite | 6 / 5 — le plus récent en adoption à grande échelle |
 | **Total /50 (interne / agent indépendant)** | **43 / 40** | **41 / 44** | **39 / 39** | **36 / 31** |
 
 Contrairement au backend et à la base de données, les deux évaluations indépendantes ne convergent pas sur un vainqueur net : Angular l'emporte dans la notation interne, React/Next.js dans la notation indépendante. L'écart se concentre sur deux critères :
 - **Accessibilité** : outillage officiel mais plus restreint (Angular CDK) contre écosystème de composants plus riche et éprouvé mais non officiel (React Aria, Radix).
-- **i18n** : outillage officiel mais plus rigide (`@angular/localize`) contre bibliothèque non officielle mais de facto standard et plus mature en pratique (`ngx-translate`, `next-intl`, `vue-i18n`).
+- **i18n** : outillage officiel mais plus rigide (`@angular/localize`) contre bibliothèque non officielle mais de facto standard et plus mature en pratique (`next-intl`, `vue-i18n`).
 
 Un sixième critère (performance / poids du runtime) a été testé pour tenter de départager les deux options, mais a été écarté de la décision finale : jugé trop dépendant de choix de configuration ultérieurs (Angular zoneless vs zone.js, React Server Components vs hydratation classique par les deux évaluations elles-mêmes) pour servir de critère décisif. Il est documenté ici pour traçabilité mais ne compte pas dans le total ci-dessus : Angular 5/3, React/Next.js 7/5, Vue/Nuxt 8/7, Svelte/SvelteKit 10/9 (interne / agent indépendant).
 
@@ -302,11 +302,11 @@ Critère organisationnel (priorité 2) :
 | Coût | 6 — tarification complexe, frais de sortie élevés | 6 — comparable à AWS | 7 — compute généralement un peu moins cher | 9 — nettement moins cher, notamment sur la sortie de données |
 | Compétences déjà dans l'équipe | 9 — utilisé en production (UK, CA) | 9 — utilisé en production (US, seule application containerisée de l'existant) | 1 — aucun historique | 7 — utilisé en production (FR), sur le système jugé le plus faible à l'audit |
 
-Le critère organisationnel ne renverse pas le classement technique : l'avantage de coût et de simplicité d'OVHcloud ne compense pas son retard technique sur la couverture géographique, le service PostgreSQL managé et l'outillage CI/CD/Kubernetes.
+Le critère organisationnel ne renverse pas le classement technique : l'avantage de coût et de simplicité d'OVHcloud ne compense pas son retard technique sur la couverture géographique, le service PostgreSQL managé et les plateformes de conteneurs sans cluster.
 
 **Décision : AWS.**
 
-Justification : meilleur score sur les deux évaluations indépendantes, et seul le classement est resté identique entre les deux (contrairement au choix du framework frontend) — signal de robustesse plus fort. Déjà utilisé en production sur deux des quatre systèmes existants (UK, CA), ce qui confirme une compétence déjà disponible en interne.
+Justification : meilleur score sur les deux évaluations indépendantes, et classement identique entre les deux évaluations (comme pour le backend, la base de données et l'exécution, contrairement au choix du framework frontend) — signal de robustesse. Déjà utilisé en production sur deux des quatre systèmes existants (UK, CA), ce qui confirme une compétence déjà disponible en interne.
 
 **Choix de l'outil d'intégration et de déploiement continus (CI/CD)**
 
@@ -317,11 +317,13 @@ Candidats évalués : (A) GitHub Actions ; (B) GitLab CI ; (C) AWS CodePipeline 
 | Critère | A. GitHub Actions | B. GitLab CI | C. AWS CodePipeline | D. Jenkins |
 |---|---|---|---|---|
 | Intégration au dépôt de code (GitHub) | 10 — natif sur le dépôt GitHub déjà en place | 4 — suppose de migrer ou dupliquer le dépôt | 7 — connecteur GitHub disponible, pensé d'abord pour CodeCommit | 6 — plugin GitHub fonctionnel mais pas natif |
-| Déploiement vers ECR / ECS Fargate | 8 — actions communautaires matures, non officielles AWS | 8 — équivalent, intégration AWS via plugin | 10 — natif, conçu pour ECS | 7 — plugins disponibles mais à maintenir soi-même |
+| Déploiement vers ECR / ECS Fargate | 9 — actions officielles maintenues par AWS (`aws-actions/*`), à assembler soi-même | 8 — équivalent, intégration AWS via plugin | 10 — natif, conçu pour ECS | 7 — plugins disponibles mais à maintenir soi-même |
 | Charge opérationnelle (service hébergé) | 9 — entièrement managé, aucune infrastructure à opérer | 8 — managé en SaaS, légèrement moins intégré à l'hébergement choisi | 9 — managé, mise à l'échelle automatique | 3 — serveur à installer, sécuriser et maintenir soi-même, la charge manuelle reprochée à l'existant |
 | Portabilité / évitement du lock-in | 6 — spécifique à GitHub, mais format YAML courant | 7 — portable, mais suppose d'adopter la plateforme GitLab | 3 — fortement couplé à l'écosystème AWS, en plus de l'hébergement | 9 — le plus portable, indépendant de tout fournisseur |
-| Maturité / écosystème | 9 — écosystème très large d'actions communautaires | 8 — mature, écosystème un peu plus restreint | 7 — plus récent, adoption moindre | 9 — le plus ancien et éprouvé, au prix de plus de plugins à gérer |
-| **Total /50** | **42** | **35** | **36** | **34** |
+| Maturité / écosystème | 9 — écosystème très large d'actions communautaires | 8 — mature, écosystème un peu plus restreint | 7 — adoption moindre, écosystème plus restreint | 9 — le plus ancien et éprouvé, au prix de plus de plugins à gérer |
+| **Total /50** | **43** | **35** | **36** | **34** |
+
+Le premier critère suppose le code hébergé sur GitHub, ce qui n'est acquis que pour le dépôt de la PoC. Sans lui, le classement ne change pas : GitHub Actions 33/40, GitLab CI 31, CodePipeline 29, Jenkins 28.
 
 Critère organisationnel (priorité 2) : GitHub Actions est déjà en service sur le dépôt de la PoC tchat (étape 4), avec deux pipelines : tests à chaque modification (`ci.yml`) et test de chaos qui coupe des instances en cours de conversation (`chaos.yml`).
 
@@ -353,15 +355,16 @@ Lecture des notes :
 - **A** ne démontre rien de l'exigence multi-instances : écarté.
 - **B et C** obligent à écrire le message à deux endroits (base, puis broker) : si l'instance tombe entre les deux, la diffusion est perdue et seule la reprise par la base la rattrape. RabbitMQ ajoute en plus un cluster à opérer, sécuriser et surveiller, disproportionné pour ce volume.
 - **D** est transactionnel : PostgreSQL ne délivre une notification que si la transaction qui l'a émise est validée. Aucune notification ne peut donc annoncer un message absent de la base, et aucune infrastructure n'est ajoutée (une connexion dédiée par instance).
+- **Portée du critère 5** : il ne note que la diffusion. Avec Redis, la diffusion ne dépend plus du primaire, mais l'enregistrement des messages, oui, puisque chaque message est écrit en base avant d'être diffusé : seul un tchat par région d'origine (ci-dessous) supprime réellement cette dépendance.
 
 **Décision : PostgreSQL `LISTEN/NOTIFY`, Redis pub/sub documenté comme alternative.**
 
 Points de vigilance documentés :
 - **Pas de bascule régionale pour le tchat.** Les notifications n'existent que sur le primaire : les réplicas en lecture ne les reçoivent pas. Les instances Tchat d'Amérique du Nord écoutent donc le primaire européen, par une connexion inter-régions directe (pas via RDS Proxy, car `LISTEN` fixe la session). Si le primaire européen tombe, le tchat s'arrête dans les deux régions — limite assumée, cohérente avec le choix d'un seul primaire faisant autorité. Les conversations des clients nord-américains sont donc stockées en Europe : même cadre juridique que le reste des données (§2.1, résidence des données), y compris l'évaluation exigée par la loi 25 pour les clients québécois.
-- **Évolution possible : un tchat par région d'origine du client.** Chaque client est rattaché à une région d'origine (Europe ou Amérique du Nord, pas une par pays : aucune obligation de localisation ne le justifie, §2.1), et ses conversations vivent dans la base `chat` de cette région, quel que soit l'endroit d'où il se connecte. Une panne du primaire européen n'arrêterait plus le tchat nord-américain, et seuls les clients en voyage paieraient la latence transatlantique. C'est possible sans toucher au monolithe, puisque le tchat ne connaît ses clients que par identifiant et possède sa propre base. En contrepartie : un second primaire PostgreSQL en Amérique du Nord dédié au tchat (`LISTEN/NOTIFY` exige un primaire), un routage par identité plutôt que par proximité (région portée par le jeton, déduite du pays de la réservation pour un invité), et une file d'agents par région. Non retenu à ce stade, au volume d'un service client et avec une latence simulée conforme à l'objectif ; à reconsidérer si une exigence de disponibilité régionale du tchat apparaît, si la latence mesurée sur un vrai réseau transatlantique dépasse l'objectif, ou si une obligation de localisation est identifiée.
-- **Limite de montée en charge.** À la validation, une transaction qui a émis `NOTIFY` prend un verrou global à l'instance PostgreSQL : les validations qui notifient sont sérialisées. C'est sans effet au débit d'un support client, mais fixe le **critère de réouverture vers Redis** : un trafic soutenu au-delà d'environ 100 messages/s par région (hypothèse à valider par mesure), un besoin de présence ou d'indicateur de saisie, ou un besoin de diffusion régionale indépendante du primaire. *(Sources : documentation PostgreSQL 17 et retours d'expérience publiés, consultés via résultats de recherche — détail et liens dans l'ADR-002 du dépôt de la PoC.)*
+- **Évolution possible : un tchat par région d'origine du client.** Chaque client est rattaché à une région d'origine (Europe ou Amérique du Nord, pas une par pays : aucune obligation de localisation ne le justifie, §2.1), et ses conversations vivent dans la base `chat` de cette région, quel que soit l'endroit d'où il se connecte. Une panne du primaire européen n'arrêterait plus le tchat nord-américain, et seuls les clients en voyage paieraient la latence transatlantique. C'est possible sans toucher au monolithe, puisque le tchat ne connaît ses clients que par identifiant et possède sa propre base. En contrepartie : un second primaire PostgreSQL en Amérique du Nord dédié au tchat (`LISTEN/NOTIFY` exige un primaire), un routage par identité plutôt que par proximité (région portée par le jeton, déduite du pays de la réservation pour un invité), et une file d'agents par région. Non retenu à ce stade, au volume d'un service client et avec une latence simulée conforme à l'objectif (< 300 ms au p95) ; à reconsidérer si une exigence de disponibilité régionale du tchat apparaît, si la latence mesurée sur un vrai réseau transatlantique dépasse l'objectif, ou si une obligation de localisation est identifiée.
+- **Limite de montée en charge.** À la validation, une transaction qui a émis `NOTIFY` prend un verrou global à l'instance PostgreSQL : les validations qui notifient sont sérialisées. C'est sans effet au débit d'un support client, mais fixe le **critère de réouverture vers Redis** : un trafic soutenu au-delà d'environ 100 messages/s par région (hypothèse à valider par mesure), un besoin de présence ou d'indicateur de saisie, ou un besoin de diffusion régionale indépendante du primaire (à combiner alors avec une base `chat` régionale, voir l'évolution ci-dessus). *(Sources : documentation PostgreSQL 17 et retours d'expérience publiés, consultés via résultats de recherche — détail et liens dans l'ADR-002 du dépôt de la PoC.)*
 
-Validation par la PoC (étape 4, mesures locales Docker Compose du 19/10/2026) : sur 2 234 messages avec 4 arrêts brutaux d'instance, 0 message perdu, dupliqué ou désordonné ; latence entre instances p95 de 18,9 ms en régime établi ; 204,3 ms en simulant une instance nord-américaine (+80 ms ajoutés sur ses connexions à la base) — à confirmer sur un vrai réseau transatlantique.
+Validation par la PoC (étape 4, mesures locales Docker Compose du 19/10/2026) : sur 2 234 messages avec 4 arrêts brutaux d'instance, 0 message perdu, dupliqué ou désordonné ; latence entre instances p95 de 18,9 ms en régime établi ; 204,3 ms en simulant une instance nord-américaine (+80 ms ajoutés sur ses connexions à la base), pour un objectif < 300 ms — à confirmer sur un vrai réseau transatlantique.
 
 ### 2.3 Modélisation UML
 
@@ -381,7 +384,11 @@ Illustre la topologie AWS cible : le même artefact applicatif (monolithe) dépl
 
 **Diagramme de classes**
 
-![Diagramme de classes](Diagrammes/diagramme-classes.png)
+![Diagramme de classes — modèle de domaine](Diagrammes/diagramme-classes-domaine.png)
+
+![Diagramme de classes — Service Tchat](Diagrammes/diagramme-classes-tchat.png)
+
+![Diagramme de classes — légende](Diagrammes/diagramme-classes-legende.png)
 
 Modélise le domaine métier central (Compte, Réservation, Conducteur, Offre, Véhicule, Agence, Extra, Paiement, PersonnelAgence) et les règles métier actées au cahier des charges (mécanisme invité/activé, conducteur distinct du réservataire, réservation inter-pays via deux rôles d'agence départ/retour, délais de modification/annulation, remboursement partiel). Sert de base au modèle de données relationnel détaillé en §2.4. Un paquetage séparé représente le domaine du Service Tchat (Conversation, Message), sans association vers le domaine du monolithe : le tchat ne connaît le client et la réservation que par leurs identifiants.
 
@@ -432,8 +439,7 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 - `statut_paiement` : `confirme`, `rembourse_partiellement`, `rembourse`
 
 **Index recommandés** (usages métier directement identifiés aux user stories, §3 cahier des charges) :
-- `compte(email)` — recherche de compte à la connexion et à l'activation.
-- `reservation(reference, compte_id)` — accès invité par référence + email, et historique des réservations d'un compte.
+- `reservation(compte_id)` — historique des réservations d'un compte. La recherche de compte par email (connexion, activation) et l'accès invité par référence sont déjà couverts par les index que PostgreSQL crée pour les contraintes `UNIQUE` sur `compte(email)` et `reservation(reference)`.
 - `offre(agence_depart_id, agence_retour_id, date_debut_disponibilite, date_fin_disponibilite)` — recherche d'offre par ville/période (US "Rechercher une offre").
 - Index GiST de la contrainte d'exclusion `reservation(vehicule_id, période)` — créé par la contrainte elle-même ; sert aussi à vérifier rapidement si un véhicule est libre sur une période.
 - `vehicule(categorie_acriss, accessible)` — filtre véhicule adapté/catégorie ACRISS.
@@ -441,7 +447,7 @@ Traduction directe du diagramme de classes (§2.3) en schéma relationnel Postgr
 
 **Service Tchat (base `chat`, propre au service)**
 
-Base logique distincte, sur la même instance RDS, possédée par le seul Service Tchat (ses migrations vivent avec son code). Mêmes conventions que ci-dessus (`BIGSERIAL`, `snake_case`, énumérations natives aux valeurs en français). **Aucune clé étrangère vers la base du monolithe** : `customer_ref` et `agent_ref` reprennent l'identifiant (`sub`) du jeton JWT, `reservation_reference` est un identifiant fourni par le client.
+Base logique distincte, sur la même instance RDS, possédée par le seul Service Tchat (ses migrations vivent avec son code). Mêmes conventions que ci-dessus (`BIGSERIAL`, `snake_case`, énumérations natives aux valeurs en français), à une différence près : les noms de colonnes sont en anglais, comme dans le code de la PoC. **Aucune clé étrangère vers la base du monolithe** : `customer_ref` et `agent_ref` reprennent l'identifiant (`sub`) du jeton JWT, `reservation_reference` est un identifiant fourni par le client.
 
 | Table | Colonnes | Clés / contraintes |
 |---|---|---|

@@ -67,7 +67,7 @@ Un **diagramme de classes UML**, représentant les entités du domaine métier, 
 **Paquetage séparé « Service Tchat »** (domaine du service indépendant, avec sa propre base `chat` — à représenter dans un cadre de paquetage UML distinct, **sans aucune association** vers les classes du monolithe ci-dessus) :
 
 - **Conversation**
-  Attributs : `customerRef` (identifiant du client, issu de son jeton), `typeClient` (compte | invité), `referenceReservation` *(nul si non précisée)*, `statut` (en attente | en cours | clôturée), `agentRef` *(nul tant que non prise en charge)*, `lastSeq` (dernier numéro de séquence attribué), `dateCreation`, `datePriseEnCharge` *(nul)*, `dateCloture` *(nul)*.
+  Attributs : `customerRef` (identifiant du client, issu de son jeton), `clientRequestId` (identifiant généré par le client, rend l'ouverture d'une conversation idempotente en cas de renvoi), `typeClient` (compte | invité), `referenceReservation` *(nul si non précisée)*, `statut` (en attente | en cours | clôturée), `agentRef` *(nul tant que non prise en charge)*, `lastSeq` (dernier numéro de séquence attribué), `dateCreation`, `datePriseEnCharge` *(nul)*, `dateCloture` *(nul)*.
   Rôle : échange entre un client (connecté ou invité) et un agent du service client. Le client et la réservation ne sont connus que par leurs **identifiants** (pas d'association vers `Compte` ni `Réservation`) : le tchat est autonome vis-à-vis du monolithe.
 
 - **Message**
