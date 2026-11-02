@@ -57,6 +57,44 @@ own subscribers.
 Stack: Java 21, Spring Boot 4.1, Flyway, PostgreSQL 17, Angular 22, Node 24, nginx 1.28, Docker
 Compose, GitHub Actions.
 
+## Data structure
+
+The chat owns one PostgreSQL database, `chat`, with two tables and four enum types:
+
+| File | Content |
+|---|---|
+| [`V1__chat.sql`](chat-service/src/main/resources/db/migration/V1__chat.sql) | The full schema, applied by Flyway at startup: `conversation`, `message`, the enum types, constraints and indexes |
+| [`SchemaConstraintsIT.java`](chat-service/src/test/java/com/ycyw/chat/SchemaConstraintsIT.java) | Tests the constraints against a real PostgreSQL |
+| [`01-chat-database.sql`](infra/postgres/init/01-chat-database.sql) | Dev-only bootstrap of the `chat` database and its owner role |
+
+The schema implements the Service Tchat package of the class diagram (proposition d'architecture,
+§2.3 and §2.4):
+
+- `Conversation` ◆ `Message` becomes `message.conversation_id` with the primary key
+  `(conversation_id, seq)`: a message cannot exist outside its conversation, and `seq` has no gaps.
+- `clientRequestId` and `clientMessageId` are unique keys (per customer, per conversation), so a
+  resent request or message is stored once.
+- No foreign key to the monolith: `customer_ref`, `agent_ref` and `reservation_reference` are
+  identifiers only (ADR-001).
+- The technical `id` (`BIGSERIAL`) is not on the conceptual diagram.
+
+Columns are snake_case, and a few are named in English. Enum values have no accents
+(`invite`, `cloturee`, `systeme`). The attributes that differ from the diagram:
+
+| Class diagram | SQL column |
+|---|---|
+| `Conversation.statut` | `conversation.status` |
+| `Conversation.typeClient` | `conversation.customer_kind` |
+| `Conversation.referenceReservation` | `conversation.reservation_reference` |
+| `Conversation.datePriseEnCharge` | `conversation.claimed_at` |
+| `Conversation.dateCloture` | `conversation.closed_at` |
+| `Conversation.dateCreation` / `Message.dateCreation` | `created_at` |
+| `Message.roleEmetteur` | `message.sender_role` |
+| `Message.emetteurRef` | `message.sender_ref` |
+| `Message.contenu` | `message.content` |
+
+The other attributes keep their name in snake_case (`customerRef` → `customer_ref`, `lastSeq` → `last_seq`).
+
 ## Quick start
 
 Prerequisites:
