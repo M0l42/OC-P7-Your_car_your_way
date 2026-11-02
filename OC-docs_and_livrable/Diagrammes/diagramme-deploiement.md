@@ -14,6 +14,7 @@
 - **Redondance applicative** : plusieurs instances du monolithe par région (pas de point de défaillance unique, contrairement à l'existant).
 - **Déploiements automatisés (CI/CD)** : remplace les déploiements manuels de l'existant, identifiés à l'audit comme cause probable du faible taux de réussite des déploiements et du MTTR élevé.
 - **Service Tchat** (étape 4, PoC) : service **indépendant** du monolithe (WebSocket, profil de charge différent), déployé séparément mais sur la même plateforme de conteneurs managée (pas besoin de Kubernetes pour faire cohabiter les deux).
+- **Base `chat`** : le Service Tchat possède sa propre base logique PostgreSQL `chat`, hébergée **sur la même instance RDS** que la base du monolithe (aucune infrastructure supplémentaire). Ses instances se synchronisent par `LISTEN/NOTIFY` PostgreSQL ; or les notifications n'existent que sur le **primaire** (les réplicas en lecture ne les reçoivent pas) : les instances Tchat d'Amérique du Nord se connectent donc **au primaire européen**, directement (pas via RDS Proxy). Conséquence assumée : pas de bascule régionale pour le tchat.
 
 ## Objectif de ce diagramme
 
@@ -31,7 +32,7 @@ Dans **chaque région** :
 - Un nœud **"Service applicatif (ECS/Fargate)"** contenant **N instances/tasks** du conteneur Docker du monolithe (représenter explicitement plusieurs instances, pour illustrer la redondance/absence de point de défaillance unique).
 - Un nœud **"Service Tchat (ECS/Fargate)"**, séparé du service applicatif ci-dessus, avec son propre load balancer ou une route dédiée supportant les connexions persistantes (WebSocket).
 - Un nœud **"PostgreSQL (Amazon RDS)"** :
-  - Dans une seule région désignée comme région primaire : l'instance **primaire (lecture/écriture)**.
+  - Dans une seule région désignée comme région primaire : l'instance **primaire (lecture/écriture)**, qui héberge deux bases logiques : la base du monolithe et la base `chat` du Service Tchat (représenter les deux bases comme deux artefacts dans le même nœud).
   - Dans l'autre région (et toute région supplémentaire) : un **réplica en lecture**.
 
 **Au niveau global** (au-dessus des régions) :
@@ -57,6 +58,9 @@ Dans **chaque région** :
 - Service applicatif → Prestataire de paiement externe (HTTPS, appel sortant)
 - Pipeline CI/CD → registre de conteneurs → Service applicatif de chaque région (flux de déploiement, à distinguer visuellement du trafic utilisateur, ex. flèche en pointillé ou couleur différente)
 - Client → Service Tchat, potentiellement via un chemin WebSocket distinct (à illustrer si cela aide la lisibilité, sinon simplifier)
+- Service Tchat (région Europe) → base `chat` sur le primaire (écritures + `LISTEN`)
+- Service Tchat (région Amérique du Nord) → base `chat` **sur le primaire européen** (écritures + `LISTEN`, liaison inter-régions — à étiqueter « LISTEN/NOTIFY : primaire uniquement »), et non sur le réplica local
+- Pipeline CI/CD → registre de conteneurs → Service Tchat de chaque région (même flux de déploiement que le monolithe, image distincte)
 
 ## Explicitement hors périmètre de ce diagramme
 
@@ -69,9 +73,10 @@ Dans **chaque région** :
 - Le frontend Angular est servi par un **CDN séparé du backend** (ex. S3 + CloudFront) — déploiement indépendant, pas sur Fargate/ECS avec l'API.
 - **2 régions** : Europe (FR/DE/ES/IT/UK) et Amérique du Nord (CA/US) — pas de granularité plus fine par pays.
 - **Routage global : Amazon Route 53, routage par latence.**
-- **Pipeline CI/CD : GitHub Actions**, cohérent avec le dépôt GitHub déjà requis pour la PoC tchat.
+- **Pipeline CI/CD : GitHub Actions**, retenu après comparaison avec GitLab CI, AWS CodePipeline et Jenkins (proposition d'architecture, §2.2) ; déjà en service sur le dépôt de la PoC tchat.
+- **Un seul primaire, en Europe** : aucune obligation de localisation des données n'a été identifiée dans les 7 pays ; la copie des données vers le réplica nord-américain est un transfert encadré (clauses contractuelles types, adéquation canadienne, évaluation loi 25 pour le Québec). Détail et sources : proposition d'architecture, §2.1, « Résidence des données ».
 
-Il n'y a plus d'hypothèse ouverte sur ce diagramme — tous les choix de nommage/outillage sont actés ; Claude Design n'a qu'à dessiner la topologie décrite ci-dessus.
+Tous les choix de nommage/outillage sont actés ; Claude Design n'a qu'à dessiner la topologie décrite ci-dessus. Seule hypothèse restante, sans effet sur le dessin : la topologie à primaire unique repose sur une vérification juridique faite sur sources secondaires ; si un pays imposait un jour une localisation, il recevrait son propre primaire (plan de repli documenté en §2.1).
 
 ## Style attendu
 
@@ -84,3 +89,4 @@ Le diagramme doit comporter une légende explicite couvrant au minimum :
 - La distinction visuelle entre l'instance **PostgreSQL primaire (lecture/écriture)** et les **réplicas en lecture**.
 - La signification des nœuds en pointillé/boîte 3D (`<<execution environment>>` pour les services Fargate/ECS, `<<device>>` ou équivalent pour les éléments managés comme RDS, CloudFront).
 - Une note indiquant que le **même artefact applicatif** (monolithe) tourne dans chaque région — ce n'est pas un service différent par région.
+- Une note indiquant que le Service Tchat des deux régions écoute les notifications sur le **primaire européen** (les réplicas ne reçoivent pas `NOTIFY`) : pas de bascule régionale pour le tchat.

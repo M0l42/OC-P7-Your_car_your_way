@@ -31,3 +31,8 @@ chaos/results/
 .DS_Store
 *.log
 .vscode/
+
+# Local-only course material and notes
+OC-docs_and_livrable/Docs/
+OC-docs_and_livrable/presentation-soutenance.md
+OC-docs_and_livrable/REVIEW-findings.md

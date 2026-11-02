@@ -4,7 +4,7 @@
 
 ## Contexte du projet
 
-"Your Car Your Way" est un service de location de véhicules opérant dans plusieurs pays. Ce diagramme doit modéliser le **domaine métier central** : comptes, réservations, véhicules/offres, agences, paiement — tel qu'il résulte des spécifications fonctionnelles (user stories) du projet. La base de données cible est **PostgreSQL**, modèle **relationnel** (choix explicite, pour les garanties ACID sur les réservations/paiements — pas de NoSQL en système de référence).
+"Your Car Your Way" est un service de location de véhicules opérant dans plusieurs pays. Ce diagramme doit modéliser le **domaine métier central** : comptes, réservations, véhicules/offres, agences, paiement — ainsi que, dans un paquetage séparé, le domaine du Service Tchat (conversations, messages) — tel qu'il résulte des spécifications fonctionnelles (user stories) du projet. La base de données cible est **PostgreSQL**, modèle **relationnel** (choix explicite, pour les garanties ACID sur les réservations/paiements — pas de NoSQL en système de référence).
 
 ## Objectif de ce diagramme
 
@@ -64,22 +64,33 @@ Un **diagramme de classes UML**, représentant les entités du domaine métier, 
   Attributs : `montant`, `devise`, `statutTVA` *(nul si non applicable)*, `référenceExterne` (identifiant côté Stripe), `statut` (confirmé | remboursé partiellement | remboursé).
   Rôle : trace du paiement délégué à Stripe — aucune donnée de carte, uniquement le résultat/référence.
 
+**Paquetage séparé « Service Tchat »** (domaine du service indépendant, avec sa propre base `chat` — à représenter dans un cadre de paquetage UML distinct, **sans aucune association** vers les classes du monolithe ci-dessus) :
+
+- **Conversation**
+  Attributs : `customerRef` (identifiant du client, issu de son jeton), `clientRequestId` (identifiant généré par le client, rend l'ouverture d'une conversation idempotente en cas de renvoi), `typeClient` (compte | invité), `referenceReservation` *(nul si non précisée)*, `statut` (en attente | en cours | clôturée), `agentRef` *(nul tant que non prise en charge)*, `lastSeq` (dernier numéro de séquence attribué), `dateCreation`, `datePriseEnCharge` *(nul)*, `dateCloture` *(nul)*.
+  Rôle : échange entre un client (connecté ou invité) et un agent du service client. Le client et la réservation ne sont connus que par leurs **identifiants** (pas d'association vers `Compte` ni `Réservation`) : le tchat est autonome vis-à-vis du monolithe.
+
+- **Message**
+  Attributs : `seq` (numéro d'ordre sans trou dans la conversation), `clientMessageId` (identifiant généré par l'émetteur, rend un renvoi idempotent), `type` (texte | prise en charge | clôture), `roleEmetteur` (client | agent | système), `emetteurRef`, `contenu` *(nul pour les événements système)*, `dateCreation`.
+  Rôle : élément du fil d'une conversation — message texte ou événement système (prise en charge par un agent, clôture).
+
 ## Relations à représenter (avec cardinalités)
 
 - `Compte` **1** — **0..\*** `Réservation` (un compte, invité ou activé, peut avoir plusieurs réservations)
 - `Réservation` **1** — **1** `Conducteur` (conducteur désigné, par défaut = titulaire du compte)
-- `Réservation` **1** — **1** `Offre` (l'offre réservée)
-- `Offre` **1** — **1** `Véhicule`
+- `Réservation` **\*** — **1** `Offre` (l'offre réservée ; une offre couvre une fenêtre de disponibilité et peut porter plusieurs réservations sur des périodes distinctes)
+- `Offre` **\*** — **1** `Véhicule` (un véhicule apparaît dans plusieurs offres, à des périodes ou entre des agences différentes)
 - `Offre` **\*** — **1** `Agence` (agence de départ)
 - `Offre` **\*** — **1** `Agence` (agence de retour — même classe `Agence`, deux rôles d'association distincts à nommer, ex. `agenceDepart` / `agenceRetour`)
 - `Véhicule` **\*** — **1** `Agence` (agence de rattachement du véhicule)
 - `Réservation` **1** — **0..\*** `ReservationExtra` — **\*** — **1** `Extra`
 - `Réservation` **1** — **1** `Paiement`
 - `Agence` **1** — **0..\*** `PersonnelAgence`
+- `Conversation` **1** ◆— **0..\*** `Message` (composition, ordonnée par `seq` : un message n'existe pas hors de sa conversation) — dans le paquetage Service Tchat
 
 ## Explicitement hors périmètre de ce diagramme
 
-- Pas d'entités liées au tchat (Conversation, Message) — c'est le périmètre d'une PoC séparée (étape 4), avec sa propre architecture ; peut faire l'objet d'un diagramme de classes dédié plus tard si besoin, mais ne pas l'inclure ici.
+- Pas d'association entre le paquetage Service Tchat et le domaine du monolithe : `Conversation` référence le client et la réservation par identifiant uniquement. *(Mis à jour à l'étape 4 : la version précédente excluait totalement Conversation et Message de ce diagramme.)*
 - Pas de modèle de facturation détaillé (mentions légales, numérotation) — volontairement écarté du périmètre fonctionnel, remplacé par un simple reçu de paiement.
 - Pas de colonnes techniques de base de données (clés primaires/étrangères auto-générées, index) — modèle conceptuel, pas schéma physique.
 
@@ -87,6 +98,7 @@ Un **diagramme de classes UML**, représentant les entités du domaine métier, 
 
 - `Compte` et `Profil` sont **fusionnés en une seule classe** `Compte`, avec attributs personnels nullables tant que le compte est à l'état invité.
 - `Offre` reste une **entité distincte de `Véhicule`** : cohérent avec les user stories, où une recherche retourne des offres (véhicule + période + tarif + agences), pas des véhicules bruts.
+- Cardinalités `Réservation` **\*** — **1** `Offre` et `Offre` **\*** — **1** `Véhicule` *(corrigées après relecture : la version précédente indiquait 1 — 1 pour les deux, ce qui ne correspondait ni au sens métier ni au schéma SQL ; l'absence de double réservation sur un même véhicule est garantie par une contrainte d'exclusion dans le schéma, §2.4)*.
 - `Offre` porte bien **deux rôles d'association `Agence`** (départ/retour, même classe `Agence`) — nécessaire pour couvrir le cas inter-pays (ville de départ ≠ pays de la ville de retour) ; à bien nommer les rôles dans le diagramme pour éviter toute ambiguïté.
 
 ## Style attendu
@@ -99,3 +111,4 @@ Le diagramme doit comporter une légende explicite couvrant au minimum :
 - La signification de la notation de cardinalité (ex. `1`, `0..*`, `0..1`) utilisée sur les associations.
 - La distinction entre une association simple (ligne pleine) et une classe-association (ligne pointillée reliant `ReservationExtra` à l'association `Réservation`–`Extra`).
 - Le rôle des deux associations distinctes entre `Offre` et `Agence` (`agenceDepart` / `agenceRetour`), pour éviter toute ambiguïté de lecture.
+- La signification du cadre de paquetage « Service Tchat » : domaine d'un service déployé séparément, avec sa propre base, relié au reste uniquement par des identifiants (aucune association).
